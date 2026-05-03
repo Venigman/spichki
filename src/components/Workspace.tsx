@@ -160,30 +160,26 @@ export function Workspace() {
   return (
     <div className="workspace">
       <div className="runner" data-command-mode={!!commandEndpoint}>
-        {!commandEndpoint && (
-          <>
-            <Dropdown<Method>
-              className="method-select"
-              ariaLabel="HTTP method"
-              value={method}
-              onChange={(m) => {
-                setMethod(m);
-                setCommandEndpoint(null);
-              }}
-              triggerProps={{ "data-method": method } as React.ButtonHTMLAttributes<HTMLButtonElement>}
-              triggerStyle={{ color: `var(--method-${method.toLowerCase()})` }}
-              options={availableMethods.map((m) => ({
-                value: m,
-                label: m,
-                color: `var(--method-${m.toLowerCase()})`,
-              }))}
-              menuWidth="auto"
-            />
-            <span className="path-prefix" title={active.baseURL}>
-              {active.baseURL.replace(/^https?:\/\//, "")}
-            </span>
-          </>
-        )}
+        <Dropdown<Method>
+          className="method-select"
+          ariaLabel="HTTP method"
+          value={method}
+          onChange={(m) => {
+            setMethod(m);
+            setCommandEndpoint(null);
+          }}
+          triggerProps={{ "data-method": method } as React.ButtonHTMLAttributes<HTMLButtonElement>}
+          triggerStyle={{ color: `var(--method-${method.toLowerCase()})` }}
+          options={availableMethods.map((m) => ({
+            value: m,
+            label: m,
+            color: `var(--method-${m.toLowerCase()})`,
+          }))}
+          menuWidth="auto"
+        />
+        <span className="path-prefix" title={active.baseURL}>
+          {active.baseURL.replace(/^https?:\/\//, "")}
+        </span>
         <input
           className="path-input"
           value={path}
