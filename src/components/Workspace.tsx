@@ -449,15 +449,10 @@ function KVSection({
   keyPlaceholder: string;
   valuePlaceholder: string;
 }) {
-  // Hooks ВСЕГДА на верхнем уровне (Rules of Hooks). Early return ниже.
+  // Hook на верхнем уровне до early return.
   const [open, setOpen] = useState(true);
-  useEffect(() => {
-    // когда добавили строку — раскрываем
-    if (rows.length > 0 && !open) setOpen(true);
-  }, [rows.length, open]);
 
   // Если пусто — не рендерим вообще: на телефоне эти секции забирают высоту.
-  // Юзер добавит через кнопки "Query"/"Header" под body.
   if (rows.length === 0) return null;
 
   return (
