@@ -34,6 +34,9 @@ export function Workspace() {
   const [headers, setHeaders] = useState<KV[]>([]);
   const [query, setQuery] = useState<KV[]>([]);
   const [body, setBody] = useState("");
+  // Для command-mode: когда тапаешь POST endpoint с body={"command":"/X"},
+  // в path-input показываем "/X", а реальный POST-путь и body-шаблон сохраняем тут.
+  const [commandEndpoint, setCommandEndpoint] = useState<{ path: string; bodyTemplate: string } | null>(null);
   const [result, setResult] = useState<RunResult | null>(null);
   const [running, setRunning] = useState(false);
   // Mobile-only: Request panel can be collapsed so the user can read Response
@@ -48,6 +51,7 @@ export function Workspace() {
     setBody("");
     setMethod("GET");
     setPath("/");
+    setCommandEndpoint(null);
   }, [active?.id]);
 
   // Publish read/edit mode to the topbar banner via context
@@ -116,9 +120,23 @@ export function Workspace() {
     override?: Partial<{ method: Method; path: string; body: string }>
   ) {
     if (!active || running) return;
-    const useMethod = override?.method ?? method;
-    const usePath = override?.path ?? path;
-    const useBody = override?.body ?? body;
+    let useMethod = override?.method ?? method;
+    let usePath = override?.path ?? path;
+    let useBody = override?.body ?? body;
+
+    // Command mode: в path-input лежит команда, реальный POST идёт в commandEndpoint.path
+    // с body={...template, command: <input>}.
+    if (commandEndpoint && !override) {
+      useMethod = "POST";
+      usePath = commandEndpoint.path;
+      try {
+        const tpl = JSON.parse(commandEndpoint.bodyTemplate);
+        useBody = JSON.stringify({ ...tpl, command: path });
+      } catch {
+        useBody = JSON.stringify({ command: path });
+      }
+    }
+
     setRunning(true);
     const res = await runRequest({
       api: active,
@@ -141,24 +159,31 @@ export function Workspace() {
 
   return (
     <div className="workspace">
-      <div className="runner">
-        <Dropdown<Method>
-          className="method-select"
-          ariaLabel="HTTP method"
-          value={method}
-          onChange={(m) => setMethod(m)}
-          triggerProps={{ "data-method": method } as React.ButtonHTMLAttributes<HTMLButtonElement>}
-          triggerStyle={{ color: `var(--method-${method.toLowerCase()})` }}
-          options={availableMethods.map((m) => ({
-            value: m,
-            label: m,
-            color: `var(--method-${m.toLowerCase()})`,
-          }))}
-          menuWidth="auto"
-        />
-        <span className="path-prefix" title={active.baseURL}>
-          {active.baseURL.replace(/^https?:\/\//, "")}
-        </span>
+      <div className="runner" data-command-mode={!!commandEndpoint}>
+        {!commandEndpoint && (
+          <>
+            <Dropdown<Method>
+              className="method-select"
+              ariaLabel="HTTP method"
+              value={method}
+              onChange={(m) => {
+                setMethod(m);
+                setCommandEndpoint(null);
+              }}
+              triggerProps={{ "data-method": method } as React.ButtonHTMLAttributes<HTMLButtonElement>}
+              triggerStyle={{ color: `var(--method-${method.toLowerCase()})` }}
+              options={availableMethods.map((m) => ({
+                value: m,
+                label: m,
+                color: `var(--method-${m.toLowerCase()})`,
+              }))}
+              menuWidth="auto"
+            />
+            <span className="path-prefix" title={active.baseURL}>
+              {active.baseURL.replace(/^https?:\/\//, "")}
+            </span>
+          </>
+        )}
         <input
           className="path-input"
           value={path}
@@ -301,9 +326,26 @@ export function Workspace() {
               <EndpointsList
                 endpoints={active.endpoints}
                 onPick={(ep) => {
+                  // Если POST с body, в котором есть "command" — переходим в command-mode:
+                  // в path-input показываем команду, реальный путь и шаблон храним.
+                  if (ep.method === "POST" && typeof ep.body === "string") {
+                    try {
+                      const obj = JSON.parse(ep.body);
+                      if (obj && typeof obj === "object" && typeof obj.command === "string") {
+                        setMethod("POST");
+                        setPath(obj.command);
+                        setBody("");
+                        setCommandEndpoint({ path: ep.path, bodyTemplate: ep.body });
+                        return;
+                      }
+                    } catch {
+                      /* not json — fall through */
+                    }
+                  }
                   setMethod(ep.method as Method);
                   setPath(ep.path);
-                  if (ep.body !== undefined) setBody(ep.body);
+                  setBody(ep.body !== undefined ? ep.body : "");
+                  setCommandEndpoint(null);
                 }}
               />
             )}
