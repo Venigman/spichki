@@ -77,6 +77,9 @@ function send(res: ServerResponse, status: number, body: unknown) {
  *                                                — merge top-level fields
  */
 export default defineConfig({
+  // Relative paths so the build works both at site root and at a subpath
+  // like /veni-hub/ (GitHub Pages serves project repos from a subpath).
+  base: "./",
   plugins: [
     react(),
     {

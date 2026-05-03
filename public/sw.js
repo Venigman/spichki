@@ -7,7 +7,11 @@
  * фоном — поэтому юзер не ждёт сети, а получает свежее на след. визите.
  */
 const CACHE_VERSION = "veni-v1";
-const APP_SHELL = ["/", "/manifest.webmanifest"];
+
+// Базовый scope — директория где зарегистрирован SW. На корневом
+// домене это "/", на subpath (типа GitHub Pages /veni-hub/) — "/veni-hub/".
+const SCOPE = new URL("./", self.location).pathname;
+const APP_SHELL = [SCOPE, SCOPE + "manifest.webmanifest"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -36,9 +40,9 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
   const req = event.request;
   if (req.method !== "GET") return;
-  // Не кэшируем API-вызовы (пресеты + любые сторонние)
   const url = new URL(req.url);
-  if (url.pathname.startsWith("/api/")) return;
+  // Не кэшируем API-вызовы и сторонние домены
+  if (url.pathname.includes("/api/")) return;
   if (url.origin !== self.location.origin) return;
 
   event.respondWith(
