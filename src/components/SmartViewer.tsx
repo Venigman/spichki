@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ChevronDown,
   ChevronRight,
@@ -6,6 +6,8 @@ import {
   Download,
   Image as ImageIcon,
   Layers,
+  Pause,
+  Play,
   Rows3,
   FileText,
   Sparkles,
@@ -935,12 +937,12 @@ function MediaView({
             maxWidth: "100%",
             borderRadius: 8,
             border: "1px solid var(--border-muted)",
-            background: "#000",
+            background: "var(--bg-elevated)",
           }}
         />
       )}
       {blobUrl && meta.kind === "audio" && (
-        <audio src={blobUrl} controls style={{ width: "100%" }} />
+        <AudioPlayer src={blobUrl} />
       )}
       {blobUrl && meta.kind === "pdf" && (
         <iframe
@@ -998,4 +1000,91 @@ function TextBlobView({ blobUrl }: { blobUrl: string }) {
       {text}
     </pre>
   );
+}
+
+/* ─────────────────────────────────────────────
+   AUDIO PLAYER — кастомный в нашем стиле.
+   Скрытый <audio> + наша кнопка play/pause + range-slider + время.
+   ───────────────────────────────────────────── */
+function AudioPlayer({ src }: { src: string }) {
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [playing, setPlaying] = useState(false);
+  const [time, setTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+
+  useEffect(() => {
+    const a = audioRef.current;
+    if (!a) return;
+    const onTime = () => setTime(a.currentTime);
+    const onMeta = () => setDuration(a.duration || 0);
+    const onEnd = () => setPlaying(false);
+    a.addEventListener("timeupdate", onTime);
+    a.addEventListener("loadedmetadata", onMeta);
+    a.addEventListener("ended", onEnd);
+    return () => {
+      a.removeEventListener("timeupdate", onTime);
+      a.removeEventListener("loadedmetadata", onMeta);
+      a.removeEventListener("ended", onEnd);
+    };
+  }, [src]);
+
+  function toggle() {
+    const a = audioRef.current;
+    if (!a) return;
+    if (a.paused) {
+      void a.play();
+      setPlaying(true);
+    } else {
+      a.pause();
+      setPlaying(false);
+    }
+  }
+
+  function seek(e: React.ChangeEvent<HTMLInputElement>) {
+    const a = audioRef.current;
+    if (!a) return;
+    const t = Number(e.target.value);
+    a.currentTime = t;
+    setTime(t);
+  }
+
+  const pct = duration > 0 ? (time / duration) * 100 : 0;
+
+  return (
+    <div className="audio-player">
+      <audio ref={audioRef} src={src} preload="metadata" />
+      <button
+        type="button"
+        className="audio-player-btn"
+        onClick={toggle}
+        aria-label={playing ? "Пауза" : "Воспроизвести"}
+      >
+        {playing ? (
+          <Pause size={14} strokeWidth={2} />
+        ) : (
+          <Play size={14} strokeWidth={2} />
+        )}
+      </button>
+      <input
+        type="range"
+        className="audio-player-range"
+        min={0}
+        max={duration || 0}
+        step={0.01}
+        value={time}
+        onChange={seek}
+        style={{ ["--pct" as string]: `${pct}%` }}
+      />
+      <span className="audio-player-time">
+        {fmtTime(time)} / {fmtTime(duration)}
+      </span>
+    </div>
+  );
+}
+
+function fmtTime(sec: number): string {
+  if (!isFinite(sec) || sec < 0) return "0:00";
+  const m = Math.floor(sec / 60);
+  const s = Math.floor(sec % 60);
+  return `${m}:${s.toString().padStart(2, "0")}`;
 }
