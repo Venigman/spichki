@@ -275,7 +275,7 @@ function PresetCard({
                 className="kv-input"
                 type="password"
                 value={tokenDraft}
-                placeholder="Токен (например 101010)"
+                placeholder="Токен"
                 spellCheck={false}
                 autoFocus
                 onChange={(e) => onTokenChange(e.target.value)}
