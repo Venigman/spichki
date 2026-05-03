@@ -190,18 +190,6 @@ export function Workspace() {
           )}
           <span>{running ? "Sending…" : "Send"}</span>
         </button>
-        {(method === "POST" || method === "PUT" || method === "PATCH" || method === "DELETE") && (
-          <textarea
-            className="runner-body-input"
-            value={body}
-            onChange={(e) => setBody(e.target.value)}
-            placeholder='{"command":"/status"}'
-            spellCheck={false}
-            autoCapitalize="off"
-            autoCorrect="off"
-            rows={2}
-          />
-        )}
       </div>
       {sendPreview && (
         <div className="send-preview" data-kind={sendPreview.kind}>
@@ -280,6 +268,35 @@ export function Workspace() {
                 )}
               </div>
             )}
+            {(method === "POST" || method === "PUT" || method === "PATCH" || method === "DELETE") && (
+              <div className="section">
+                <div className="section-label">
+                  <span>Body</span>
+                  <button
+                    type="button"
+                    className="btn btn--ghost"
+                    style={{ height: 24, padding: "0 8px", fontSize: 11 }}
+                    onClick={() => {
+                      try {
+                        setBody(JSON.stringify(JSON.parse(body), null, 2));
+                      } catch {
+                        /* noop */
+                      }
+                    }}
+                  >
+                    Format JSON
+                  </button>
+                </div>
+                <textarea
+                  className="body-textarea"
+                  value={body}
+                  onChange={(e) => setBody(e.target.value)}
+                  placeholder='{"key": "value"}'
+                  spellCheck={false}
+                />
+              </div>
+            )}
+
             {active.endpoints && active.endpoints.length > 0 && (
               <EndpointsList
                 endpoints={active.endpoints}
