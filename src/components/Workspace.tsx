@@ -276,9 +276,11 @@ export function Workspace() {
               }}
               title={ep.label}
             >
-              <span className="cmd-suggest-method" data-method={isCmd ? "POST" : ep.method}>
-                {isCmd ? "/" : ep.method}
-              </span>
+              {!isCmd && (
+                <span className="cmd-suggest-method" data-method={ep.method}>
+                  {ep.method}
+                </span>
+              )}
               <span className="cmd-suggest-cmd">{cmd}</span>
               <span className="cmd-suggest-label">{ep.label}</span>
             </button>

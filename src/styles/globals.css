@@ -371,31 +371,36 @@ a:hover { text-decoration: underline; }
    совпадающий с другими endpoint'ами. Клик — подставляет полную команду. */
 .cmd-suggest {
   display: flex;
-  flex-direction: column;
-  gap: 1px;
-  padding: 4px 16px 0;
-  background: var(--bg-canvas);
-  max-height: 280px;
-  overflow-y: auto;
-}
-.cmd-suggest-item {
-  display: flex;
+  flex-direction: row;
   align-items: center;
-  gap: 8px;
-  padding: 6px 8px;
-  background: transparent;
+  gap: 6px;
+  padding: 6px 16px;
+  background: var(--bg-canvas);
+  overflow-x: auto;
+  scrollbar-width: thin;
+  -webkit-overflow-scrolling: touch;
+}
+.cmd-suggest::-webkit-scrollbar { height: 4px; }
+.cmd-suggest::-webkit-scrollbar-thumb { background: var(--border-muted); border-radius: 2px; }
+.cmd-suggest-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  background: var(--bg-elevated);
   color: var(--text-primary);
-  border: 1px solid transparent;
-  border-radius: 4px;
-  font: 12px/1.2 var(--font-mono, ui-monospace, "SF Mono", Menlo, monospace);
+  border: 1px solid var(--border-muted);
+  border-radius: 6px;
+  font: 11px/1.2 var(--font-mono, ui-monospace, "SF Mono", Menlo, monospace);
   cursor: pointer;
   user-select: none;
   text-align: left;
-  width: 100%;
+  flex: 0 0 auto;
+  white-space: nowrap;
 }
 .cmd-suggest-item:hover {
-  background: var(--bg-elevated);
-  border-color: var(--border-muted);
+  background: var(--bg-canvas);
+  border-color: var(--border-strong);
 }
 .cmd-suggest-method {
   flex: 0 0 auto;
