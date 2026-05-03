@@ -8,7 +8,13 @@ import {
   Check,
   Zap,
   ChevronRight,
+  Upload,
+  Copy,
+  Sparkles,
+  Loader2,
 } from "lucide-react";
+import { generatePreset, loadAIConfig } from "../lib/ai";
+import { AISettingsModal } from "./AISettingsModal";
 import { useAPIs } from "../context/APIs";
 import {
   PRESET_CATEGORIES,
@@ -49,10 +55,115 @@ export function PresetsPage() {
   } = useAPIs();
   const [editing, setEditing] = useState<APIPreset | null>(null);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
-  const [applyingId, setApplyingId] = useState<string | null>(null);
-  const [tokenDraft, setTokenDraft] = useState("");
+  const [importFlash, setImportFlash] = useState<string | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
+  const importInputRef = useRef<HTMLInputElement>(null);
 
-  function applyPreset(p: APIPreset, token: string) {
+  function stripSecrets<T>(obj: T): T {
+    // Удаляем auth.token из любого пресета или массива пресетов перед экспортом —
+    // секреты не должны улетать в JSON который копируешь / шаришь.
+    if (Array.isArray(obj)) return obj.map((x) => stripSecrets(x)) as unknown as T;
+    if (obj && typeof obj === "object") {
+      const o = { ...(obj as Record<string, unknown>) };
+      if (o.auth && typeof o.auth === "object") {
+        const auth = { ...(o.auth as Record<string, unknown>) };
+        delete auth.token;
+        o.auth = auth;
+      }
+      if (Array.isArray(o.presets)) o.presets = stripSecrets(o.presets);
+      return o as unknown as T;
+    }
+    return obj;
+  }
+
+  async function copyToClipboard(data: unknown, label: string) {
+    const text = JSON.stringify(stripSecrets(data), null, 2);
+    try {
+      await navigator.clipboard.writeText(text);
+      flashImport(`Скопировано: ${label}`);
+    } catch {
+      // Фолбэк через document.execCommand для старых iOS Safari
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.select();
+      try {
+        document.execCommand("copy");
+        flashImport(`Скопировано: ${label}`);
+      } catch {
+        flashImport("Не удалось скопировать — браузер не разрешает");
+      }
+      document.body.removeChild(ta);
+    }
+  }
+
+  function exportOne(p: APIPreset) {
+    void copyToClipboard(p, `«${p.name}»`);
+  }
+
+  function exportAll() {
+    void copyToClipboard(
+      {
+        kind: "veni-presets",
+        version: 1,
+        exportedAt: new Date().toISOString(),
+        presets: userPresets,
+      },
+      "Все пресеты"
+    );
+  }
+
+  function importFromText(text: string): { added: number; error?: string } {
+    try {
+      const parsed = JSON.parse(text) as
+        | APIPreset
+        | APIPreset[]
+        | { presets?: APIPreset[] };
+      const list: APIPreset[] = Array.isArray(parsed)
+        ? parsed
+        : "presets" in parsed && Array.isArray(parsed.presets)
+          ? parsed.presets
+          : [parsed as APIPreset];
+      let added = 0;
+      for (const p of list) {
+        if (!p || typeof p.id !== "string" || typeof p.baseURL !== "string") {
+          continue;
+        }
+        saveUserPreset({
+          ...p,
+          endpoints: Array.isArray(p.endpoints) ? p.endpoints : [],
+          defaultHeaders: Array.isArray(p.defaultHeaders)
+            ? p.defaultHeaders
+            : [],
+        });
+        added += 1;
+      }
+      return { added };
+    } catch (e) {
+      return { added: 0, error: (e as Error).message };
+    }
+  }
+
+  function flashImport(msg: string) {
+    setImportFlash(msg);
+    setTimeout(() => setImportFlash(null), 3500);
+  }
+
+  async function handleImportFile(file: File) {
+    const text = await file.text();
+    const r = importFromText(text);
+    flashImport(
+      r.error
+        ? `Ошибка JSON: ${r.error}`
+        : r.added > 0
+          ? `Импортировано: ${r.added}`
+          : "Валидных пресетов в файле нет"
+    );
+  }
+
+  function applyPreset(p: APIPreset) {
     addAPI({
       name: p.name || "Без имени",
       baseURL: p.baseURL.replace(/\/+$/, ""),
@@ -60,15 +171,13 @@ export function PresetsPage() {
         kind: p.auth.kind,
         headerName: p.auth.headerName,
         queryName: p.auth.queryName,
-        token: p.auth.kind === "none" ? undefined : token.trim() || undefined,
+        token: p.auth.kind === "none" ? undefined : p.auth.token,
       },
       defaultHeaders: p.defaultHeaders ?? [],
       endpoints: p.endpoints,
       endpointCategories: p.endpointCategories,
       presetId: p.id,
     });
-    setApplyingId(null);
-    setTokenDraft("");
     setView("workspace");
   }
 
@@ -76,14 +185,64 @@ export function PresetsPage() {
     <div className="page">
       <div className="page-header-row">
         <h1 className="page-title">Пресеты</h1>
-        <button
-          type="button"
-          className="btn btn--primary"
-          onClick={() => setEditing(emptyPreset())}
-        >
-          <Plus size={14} strokeWidth={2} />
-          <span>Создать пресет</span>
-        </button>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          {importFlash && (
+            <span
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                padding: "0 10px",
+                height: 28,
+                borderRadius: "var(--radius-sm)",
+                background: "var(--bg-overlay)",
+                border: "1px solid var(--border-muted)",
+                fontSize: 12,
+                color: "var(--text-secondary)",
+              }}
+            >
+              {importFlash}
+            </span>
+          )}
+          <input
+            ref={importInputRef}
+            type="file"
+            accept="application/json,.json"
+            style={{ display: "none" }}
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) void handleImportFile(f);
+              e.target.value = ""; // позволяет повторно выбрать тот же файл
+            }}
+          />
+          <button
+            type="button"
+            className="btn btn--ghost"
+            onClick={() => setImportOpen(true)}
+            title="Импорт пресетов: вставить JSON или выбрать файл"
+          >
+            <Upload size={14} strokeWidth={1.8} />
+            <span>Импорт</span>
+          </button>
+          {userPresets.length > 0 && (
+            <button
+              type="button"
+              className="btn btn--ghost"
+              onClick={exportAll}
+              title="Скопировать все свои пресеты в буфер"
+            >
+              <Copy size={14} strokeWidth={1.8} />
+              <span>Экспорт</span>
+            </button>
+          )}
+          <button
+            type="button"
+            className="btn btn--primary"
+            onClick={() => setEditing(emptyPreset())}
+          >
+            <Plus size={14} strokeWidth={2} />
+            <span>Создать пресет</span>
+          </button>
+        </div>
       </div>
       <div className="page-body">
         {userPresets.length === 0 && seedPresets.length === 0 ? (
@@ -101,25 +260,21 @@ export function PresetsPage() {
           <div className="preset-cards">
             {userPresets.map((p) => {
               const confirming = confirmingId === p.id;
-              const applying = applyingId === p.id;
               return (
                 <PresetCard
                   key={p.id}
                   preset={p}
-                  applying={applying}
-                  tokenDraft={tokenDraft}
-                  onTokenChange={setTokenDraft}
-                  onApplyOpen={() => {
-                    setApplyingId(p.id);
-                    setTokenDraft("");
-                  }}
-                  onApplyCancel={() => {
-                    setApplyingId(null);
-                    setTokenDraft("");
-                  }}
-                  onApplySubmit={() => applyPreset(p, tokenDraft)}
+                  onApply={() => applyPreset(p)}
                   actions={
                     <>
+                      <button
+                        type="button"
+                        className="icon-btn"
+                        title="Скопировать JSON в буфер"
+                        onClick={() => exportOne(p)}
+                      >
+                        <Copy size={14} strokeWidth={1.6} />
+                      </button>
                       <button
                         type="button"
                         className="icon-btn"
@@ -151,28 +306,24 @@ export function PresetsPage() {
               );
             })}
             {seedPresets.map((p) => {
-              const applying = applyingId === p.id;
               const confirming = confirmingId === p.id;
               return (
                 <PresetCard
                   key={p.id}
                   preset={p}
-                  applying={applying}
-                  tokenDraft={tokenDraft}
-                  onTokenChange={setTokenDraft}
-                  onApplyOpen={() => {
-                    setApplyingId(p.id);
-                    setTokenDraft("");
-                  }}
-                  onApplyCancel={() => {
-                    setApplyingId(null);
-                    setTokenDraft("");
-                  }}
-                  onApplySubmit={() => applyPreset(p, tokenDraft)}
+                  onApply={() => applyPreset(p)}
                   source="claude"
                   sourceTag="Claude"
                   actions={
                     <>
+                      <button
+                        type="button"
+                        className="icon-btn"
+                        title="Скопировать JSON в буфер"
+                        onClick={() => exportOne(p)}
+                      >
+                        <Copy size={14} strokeWidth={1.6} />
+                      </button>
                       <button
                         type="button"
                         className="icon-btn"
@@ -219,6 +370,101 @@ export function PresetsPage() {
           setEditing(null);
         }}
       />
+      <ImportModal
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        onPickFile={() => importInputRef.current?.click()}
+        onImportText={(text) => {
+          const r = importFromText(text);
+          flashImport(
+            r.error
+              ? `Ошибка JSON: ${r.error}`
+              : r.added > 0
+                ? `Импортировано: ${r.added}`
+                : "Валидных пресетов нет"
+          );
+          if (!r.error && r.added > 0) setImportOpen(false);
+        }}
+      />
+    </div>
+  );
+}
+
+/* ─── Import modal: file picker OR paste-text ─────────── */
+function ImportModal({
+  open,
+  onClose,
+  onPickFile,
+  onImportText,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onPickFile: () => void;
+  onImportText: (text: string) => void;
+}) {
+  const [text, setText] = useState("");
+  useEffect(() => {
+    if (!open) setText("");
+  }, [open]);
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
+  if (!open) return null;
+  return (
+    <div
+      className="modal-backdrop"
+      role="dialog"
+      aria-modal="true"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div
+        className="modal"
+        style={{ maxWidth: 560, display: "flex", flexDirection: "column" }}
+      >
+        <div className="modal-header">
+          <h2>Импорт пресетов</h2>
+          <p>
+            Вставь JSON ниже или выбери файл. Принимается один пресет, массив
+            или объект с полем <code>presets</code>.
+          </p>
+        </div>
+        <div className="modal-body">
+          <textarea
+            className="body-textarea"
+            style={{ minHeight: 220, fontFamily: "var(--font-mono)" }}
+            placeholder='{"id":"...","name":"...","baseURL":"https://..."}'
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            spellCheck={false}
+            autoFocus
+          />
+        </div>
+        <div className="modal-footer">
+          <button type="button" className="btn btn--ghost" onClick={onPickFile}>
+            <Upload size={14} strokeWidth={1.8} />
+            <span>Из файла</span>
+          </button>
+          <span style={{ flex: 1 }} />
+          <button type="button" className="btn btn--ghost" onClick={onClose}>
+            Отмена
+          </button>
+          <button
+            type="button"
+            className="btn btn--primary"
+            disabled={!text.trim()}
+            onClick={() => onImportText(text)}
+          >
+            Импортировать
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -226,29 +472,19 @@ export function PresetsPage() {
 /* ─── Preset card (used for both user & seed presets) ─────────────── */
 function PresetCard({
   preset,
-  applying,
-  tokenDraft,
-  onTokenChange,
-  onApplyOpen,
-  onApplyCancel,
-  onApplySubmit,
+  onApply,
   actions,
   source,
   sourceTag,
 }: {
   preset: APIPreset;
-  applying: boolean;
-  tokenDraft: string;
-  onTokenChange: (v: string) => void;
-  onApplyOpen: () => void;
-  onApplyCancel: () => void;
-  onApplySubmit: () => void;
+  onApply: () => void;
   actions?: React.ReactNode;
   source?: string;
   sourceTag?: string;
 }) {
-  const needsToken = preset.auth.kind !== "none";
-
+  const hasToken = !!preset.auth.token;
+  const tokenWarn = preset.auth.kind !== "none" && !hasToken;
   return (
     <div className="preset-card" data-source={source}>
       <div className="preset-card-main">
@@ -259,66 +495,25 @@ function PresetCard({
         <div className="preset-card-meta">
           {preset.baseURL.replace(/^https?:\/\//, "")} · {preset.endpoints.length}{" "}
           {endpointsWord(preset.endpoints.length)}
+          {tokenWarn && (
+            <span style={{ marginLeft: 8, color: "var(--status-med)" }}>
+              · нет токена
+            </span>
+          )}
         </div>
-        {applying && (
-          <div
-            style={{
-              display: "flex",
-              gap: 6,
-              alignItems: "center",
-              marginTop: 8,
-              width: "100%",
-            }}
-          >
-            {needsToken ? (
-              <input
-                className="kv-input"
-                type="password"
-                value={tokenDraft}
-                placeholder="Токен"
-                spellCheck={false}
-                autoFocus
-                onChange={(e) => onTokenChange(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") onApplySubmit();
-                  if (e.key === "Escape") onApplyCancel();
-                }}
-                style={{ flex: 1 }}
-              />
-            ) : (
-              <div style={{ flex: 1, fontSize: 12, color: "var(--text-muted)" }}>
-                Без авторизации — токен не нужен
-              </div>
-            )}
-            <button
-              type="button"
-              className="icon-btn"
-              title="Подключить"
-              onClick={onApplySubmit}
-            >
-              <Check size={14} strokeWidth={1.8} />
-            </button>
-            <button
-              type="button"
-              className="icon-btn"
-              title="Отмена"
-              onClick={onApplyCancel}
-            >
-              <X size={14} strokeWidth={1.8} />
-            </button>
-          </div>
-        )}
       </div>
-      {!applying && (
-        <button
-          type="button"
-          className="icon-btn"
-          title="Применить как API-таб"
-          onClick={onApplyOpen}
-        >
-          <Zap size={14} strokeWidth={1.6} />
-        </button>
-      )}
+      <button
+        type="button"
+        className="icon-btn"
+        title={
+          tokenWarn
+            ? "Применить (без токена — открой Edit и впиши)"
+            : "Применить как API-таб"
+        }
+        onClick={onApply}
+      >
+        <Zap size={14} strokeWidth={1.6} />
+      </button>
       {actions}
     </div>
   );
@@ -350,10 +545,69 @@ function PresetModal({
   const [draft, setDraft] = useState<APIPreset>(preset ?? emptyPreset());
   const firstFieldRef = useRef<HTMLInputElement>(null);
   const isNew = !preset?.name;
+  const [aiOpen, setAiOpen] = useState(false);
+  const [aiBusy, setAiBusy] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+  const [aiProgress, setAiProgress] = useState<string | null>(null);
+
+  const aiCanRun =
+    draft.name.trim().length > 0 && /^https?:\/\//i.test(draft.baseURL.trim());
+
+  async function runAI() {
+    setAiError(null);
+    setAiProgress(null);
+    if (!loadAIConfig()) {
+      setAiOpen(true);
+      return;
+    }
+    setAiBusy(true);
+    try {
+      const res = await generatePreset({
+        apiName: draft.name.trim(),
+        baseURL: draft.baseURL.trim(),
+        authKind: draft.auth.kind,
+        authHeaderName: draft.auth.headerName,
+        authQueryName: draft.auth.queryName,
+        probeToken: draft.auth.token?.trim() || undefined,
+        onProgress: (m) => setAiProgress(m),
+        onCategories: (cats) =>
+          setDraft((d) => ({
+            ...d,
+            endpointCategories: cats,
+          })),
+        onEndpoint: (ep) =>
+          setDraft((d) => ({
+            ...d,
+            endpoints: [...d.endpoints, ep],
+          })),
+      });
+      if (res.noRestApi) {
+        setAiError(res.noRestApi);
+      } else if (res.added === 0) {
+        setAiError(
+          res.finalText
+            ? `ИИ не добавил действий. Ответ: ${res.finalText.slice(0, 200)}`
+            : "ИИ не добавил действий и не объяснил почему. Попробуй сменить модель в Настройках."
+        );
+      } else {
+        setAiProgress(`Добавлено ${res.added} действий`);
+        setTimeout(() => setAiProgress(null), 4000);
+      }
+    } catch (e) {
+      setAiError((e as Error).message);
+    } finally {
+      setAiBusy(false);
+    }
+  }
 
   useEffect(() => {
     if (open) {
       setDraft(preset ?? emptyPreset());
+      // Сброс AI-состояния при открытии/переключении пресета:
+      // иначе старое сообщение «нет REST API» висит на новом пресете.
+      setAiError(null);
+      setAiProgress(null);
+      setAiBusy(false);
       setTimeout(() => firstFieldRef.current?.focus(), 50);
     }
   }, [open, preset]);
@@ -508,6 +762,27 @@ function PresetModal({
             </div>
           )}
 
+          {draft.auth.kind !== "none" && (
+            <div className="field">
+              <label className="field-label" htmlFor="preset-token">
+                Токен
+              </label>
+              <input
+                id="preset-token"
+                className="field-input"
+                type="password"
+                placeholder="ghp_••••, sk-••••, и т.п."
+                value={draft.auth.token ?? ""}
+                onChange={(e) => updateAuth({ token: e.target.value })}
+                autoComplete="off"
+                spellCheck={false}
+              />
+              <span className="field-helper" style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 4, display: "block" }}>
+                Хранится локально. При экспорте в JSON автоматически вырезается.
+              </span>
+            </div>
+          )}
+
           <div className="field">
             <label className="field-label" htmlFor="preset-note">Подсказка (необязательно)</label>
             <textarea
@@ -526,6 +801,74 @@ function PresetModal({
             onChange={(rows) => update({ defaultHeaders: rows })}
           />
 
+          <div
+            className="ai-suggest"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 12,
+              flexWrap: "wrap",
+              padding: "10px 12px",
+              background: "rgba(56, 139, 253, 0.08)",
+              border: "1px solid rgba(56, 139, 253, 0.2)",
+              borderRadius: "var(--radius-sm)",
+              marginBottom: 12,
+            }}
+          >
+            <Sparkles
+              size={14}
+              strokeWidth={1.8}
+              style={{
+                color: aiError ? "var(--status-high)" : "var(--status-info)",
+                flexShrink: 0,
+              }}
+            />
+            <span style={{
+              flex: 1,
+              minWidth: 180,
+              fontSize: 12,
+              color: aiError ? "var(--status-high)" : "var(--text-secondary)",
+              lineHeight: 1.45,
+            }}>
+              {aiError
+                ? aiError
+                : aiProgress
+                  ? aiProgress
+                  : "Подберёт действия и категории по имени и URL"}
+            </span>
+            <button
+              type="button"
+              className="btn btn--ghost"
+              style={{ height: 28 }}
+              onClick={() => setAiOpen(true)}
+              disabled={aiBusy}
+              title="Настроить ИИ-ключ"
+            >
+              Настроить
+            </button>
+            <button
+              type="button"
+              className="btn btn--primary"
+              style={{ height: 28 }}
+              onClick={runAI}
+              disabled={aiBusy || !aiCanRun}
+              title={
+                aiCanRun
+                  ? "Запустить ИИ"
+                  : "Сначала заполни Название и Base URL"
+              }
+            >
+              {aiBusy ? (
+                <Loader2 size={13} strokeWidth={2} className="spin" />
+              ) : (
+                <Sparkles size={13} strokeWidth={1.8} />
+              )}
+              <span style={{ marginLeft: 8 }}>
+                {aiBusy ? "Думаю…" : "Подобрать"}
+              </span>
+            </button>
+          </div>
+
           <EndpointsEditor
             rows={draft.endpoints}
             categories={draft.endpointCategories ?? []}
@@ -543,6 +886,7 @@ function PresetModal({
           </button>
         </div>
       </form>
+      <AISettingsModal open={aiOpen} onClose={() => setAiOpen(false)} />
     </div>
   );
 }

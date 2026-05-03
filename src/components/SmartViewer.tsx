@@ -1,19 +1,169 @@
 import { useMemo, useState } from "react";
-import { ChevronDown, ChevronRight, Copy, Layers, Rows3, FileText } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronRight,
+  Copy,
+  Layers,
+  Rows3,
+  FileText,
+  Sparkles,
+  FileCode,
+  FolderOpen,
+  Folder,
+  File as FileIcon,
+} from "lucide-react";
 import { collectColumns, findPrimaryArray, previewCell } from "../lib/inspect";
 
-type ViewMode = "tree" | "table" | "raw";
+type ViewMode = "pretty" | "file" | "files" | "tree" | "table" | "raw";
+
+interface FileEntry {
+  name: string;
+  path: string;
+  type: "dir" | "file" | "symlink" | "submodule";
+  size?: number;
+}
+
+/** Распознаём GitHub-style файловый листинг (массив объектов с type/name/path). */
+function findFileListing(value: unknown): FileEntry[] | null {
+  if (!Array.isArray(value) || value.length === 0) return null;
+  const entries: FileEntry[] = [];
+  for (const item of value) {
+    if (!item || typeof item !== "object") return null;
+    const obj = item as Record<string, unknown>;
+    if (
+      typeof obj.name !== "string" ||
+      typeof obj.path !== "string" ||
+      (obj.type !== "dir" && obj.type !== "file" && obj.type !== "symlink" && obj.type !== "submodule")
+    ) {
+      return null;
+    }
+    entries.push({
+      name: obj.name,
+      path: obj.path,
+      type: obj.type,
+      size: typeof obj.size === "number" ? obj.size : undefined,
+    });
+  }
+  // Папки сверху, потом файлы — алфавитный порядок.
+  entries.sort((a, b) => {
+    if (a.type === "dir" && b.type !== "dir") return -1;
+    if (a.type !== "dir" && b.type === "dir") return 1;
+    return a.name.localeCompare(b.name);
+  });
+  return entries;
+}
+
+/** Generic «human friendly» fields commonly used by APIs to expose a ready-to-show message. */
+const HUMAN_FIELDS = [
+  "text",
+  "message",
+  "description",
+  "summary",
+  "detail",
+  "msg",
+];
+
+function findHumanText(value: unknown): string | null {
+  if (typeof value !== "object" || value === null) return null;
+  for (const key of HUMAN_FIELDS) {
+    const v = (value as Record<string, unknown>)[key];
+    if (typeof v === "string" && v.trim().length > 0) return v;
+  }
+  return null;
+}
+
+/**
+ * Распознаём GitHub-style file content: { content: "<base64>", encoding: "base64", name? }
+ * Возвращаем декодированный текст или null.
+ */
+function findFileContent(
+  value: unknown
+): { name: string | null; text: string; size: number } | null {
+  if (typeof value !== "object" || value === null) return null;
+  const obj = value as Record<string, unknown>;
+  const content = obj.content;
+  const encoding = obj.encoding;
+  if (typeof content !== "string" || encoding !== "base64") return null;
+  try {
+    // GitHub возвращает base64 с переносами строк — atob их не любит
+    const cleaned = content.replace(/\s+/g, "");
+    const binary = atob(cleaned);
+    // utf-8 декодинг
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    const text = new TextDecoder("utf-8", { fatal: false }).decode(bytes);
+    return {
+      name: typeof obj.name === "string" ? obj.name : null,
+      text,
+      size: bytes.byteLength,
+    };
+  } catch {
+    return null;
+  }
+}
 
 interface Props {
   data: unknown;
   rawText: string;
+  /**
+   * Колбэк навигации (для File Browser). При клике по папке/файлу в табе Files
+   * SmartViewer сообщает path родителю — Workspace сам делает запрос.
+   * Получает path относительно родителя репо: если url ответа содержит
+   * `/repos/{owner}/{repo}/contents/foo/bar`, navigate("foo/bar/baz") вернёт
+   * новый запрос на `/repos/{owner}/{repo}/contents/foo/bar/baz`.
+   */
+  onNavigateFile?: (entry: FileEntry, currentRequestPath: string) => void;
+  /** Текущий path запроса — нужен для навигации (хлебные крошки вверх). */
+  currentRequestPath?: string;
 }
 
-export function SmartViewer({ data, rawText }: Props) {
+export function SmartViewer({
+  data,
+  rawText,
+  onNavigateFile,
+  currentRequestPath,
+}: Props) {
   const primaryArray = useMemo(() => findPrimaryArray(data), [data]);
-  const [mode, setMode] = useState<ViewMode>(primaryArray ? "table" : "tree");
+  const humanText = useMemo(() => findHumanText(data), [data]);
+  const fileContent = useMemo(() => findFileContent(data), [data]);
+  const fileListing = useMemo(() => findFileListing(data), [data]);
+  const hasPretty =
+    humanText !== null ||
+    (data !== null &&
+      data !== undefined &&
+      (typeof data === "object" || typeof data === "string"));
+  // Приоритет открытия: декодированный файл → файловый листинг → pretty → table → tree.
+  const [mode, setMode] = useState<ViewMode>(
+    fileContent
+      ? "file"
+      : fileListing
+        ? "files"
+        : humanText
+          ? "pretty"
+          : primaryArray
+            ? "table"
+            : "tree"
+  );
 
   const tabs: { id: ViewMode; label: string; icon: React.ReactNode; show: boolean }[] = [
+    {
+      id: "file",
+      label: "File",
+      icon: <FileCode size={13} strokeWidth={1.6} />,
+      show: !!fileContent,
+    },
+    {
+      id: "files",
+      label: "Files",
+      icon: <FolderOpen size={13} strokeWidth={1.6} />,
+      show: !!fileListing,
+    },
+    {
+      id: "pretty",
+      label: "Pretty",
+      icon: <Sparkles size={13} strokeWidth={1.6} />,
+      show: hasPretty,
+    },
     {
       id: "table",
       label: "Table",
@@ -62,6 +212,15 @@ export function SmartViewer({ data, rawText }: Props) {
         </button>
       </div>
 
+      {mode === "file" && fileContent && <FileView file={fileContent} />}
+      {mode === "files" && fileListing && (
+        <FilesView
+          entries={fileListing}
+          currentRequestPath={currentRequestPath}
+          onNavigate={onNavigateFile}
+        />
+      )}
+      {mode === "pretty" && <PrettyView value={data} humanText={humanText} />}
       {mode === "tree" && <TreeView value={data} />}
       {mode === "table" && primaryArray && <TableView rows={primaryArray} />}
       {mode === "raw" && (
@@ -340,3 +499,226 @@ const tdStyle: React.CSSProperties = {
   color: "var(--text-primary)",
   verticalAlign: "top",
 };
+
+/* ─────────────────────────────────────────────
+   PRETTY VIEW — universal human-readable
+   ─────────────────────────────────────────────
+   Стратегия:
+   1. Если в ответе есть human-friendly поле (text/message/description/...) — показываем
+      его как pre-formatted текст с переносами и эмодзи (это как раз то что API
+      обычно готовит для отображения).
+   2. Иначе раскладываем объект как «ключ → значение» без скобок и кавычек.
+   3. Массив однородных объектов — список карточек.
+   4. Скаляры — крупным значением.
+   ───────────────────────────────────────────── */
+function PrettyView({
+  value,
+  humanText,
+}: {
+  value: unknown;
+  humanText: string | null;
+}) {
+  if (humanText !== null) {
+    return (
+      <div className="pretty-text">
+        {humanText}
+      </div>
+    );
+  }
+  return (
+    <div className="pretty-root">
+      <PrettyAny value={value} />
+    </div>
+  );
+}
+
+function PrettyAny({ value }: { value: unknown }) {
+  if (value === null || value === undefined) {
+    return <span className="pretty-muted">—</span>;
+  }
+  if (typeof value === "string") {
+    return <span className="pretty-string">{value}</span>;
+  }
+  if (typeof value === "number" || typeof value === "boolean") {
+    return <span className="pretty-scalar">{String(value)}</span>;
+  }
+  if (Array.isArray(value)) {
+    if (value.length === 0) return <span className="pretty-muted">пусто</span>;
+    return (
+      <div className="pretty-list">
+        {value.map((item, i) => (
+          <div key={i} className="pretty-list-item">
+            <PrettyAny value={item} />
+          </div>
+        ))}
+      </div>
+    );
+  }
+  if (typeof value === "object") {
+    const entries = Object.entries(value as Record<string, unknown>);
+    return (
+      <div className="pretty-object">
+        {entries.map(([k, v]) => (
+          <div key={k} className="pretty-row">
+            <div className="pretty-key">{prettifyKey(k)}</div>
+            <div className="pretty-value">
+              <PrettyAny value={v} />
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+  return <span>{String(value)}</span>;
+}
+
+function prettifyKey(k: string): string {
+  // user_name → User Name; firstName → First Name. Без перевода — просто читаемее.
+  return k
+    .replace(/[_-]+/g, " ")
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+/* ─────────────────────────────────────────────
+   FILE VIEW — декодированный текст файла
+   ───────────────────────────────────────────── */
+function FileView({
+  file,
+}: {
+  file: { name: string | null; text: string; size: number };
+}) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 12,
+          padding: "6px 10px",
+          background: "var(--bg-surface)",
+          border: "1px solid var(--border-muted)",
+          borderRadius: "var(--radius-sm)",
+          fontSize: 12,
+          color: "var(--text-secondary)",
+          fontFamily: "var(--font-mono)",
+        }}
+      >
+        <span style={{ color: "var(--text-primary)", fontWeight: 600 }}>
+          {file.name || "файл"}
+        </span>
+        <span>{formatBytes(file.size)}</span>
+        <span style={{ flex: 1 }} />
+        <button
+          type="button"
+          className="btn btn--ghost"
+          style={{ height: 22, padding: "0 8px", fontSize: 11 }}
+          onClick={() => navigator.clipboard.writeText(file.text)}
+          title="Копировать содержимое"
+        >
+          <Copy size={12} strokeWidth={1.6} />
+          <span style={{ marginLeft: 4 }}>Copy</span>
+        </button>
+      </div>
+      <pre className="response-area" style={{ margin: 0 }}>
+        {file.text}
+      </pre>
+    </div>
+  );
+}
+
+function formatBytes(n: number): string {
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+  return `${(n / 1024 / 1024).toFixed(2)} MB`;
+}
+
+/* ─────────────────────────────────────────────
+   FILES VIEW — кликабельный браузер по репо
+   ───────────────────────────────────────────── */
+function FilesView({
+  entries,
+  currentRequestPath,
+  onNavigate,
+}: {
+  entries: FileEntry[];
+  currentRequestPath?: string;
+  onNavigate?: (entry: FileEntry, currentRequestPath: string) => void;
+}) {
+  // Хлебные крошки строим из текущего request path. Пример:
+  //   /repos/owner/repo/contents/src/components → ["src", "components"]
+  // Наверх (в корень) ведёт ссылка на /repos/owner/repo/contents/
+  const crumbs = useMemo(() => {
+    if (!currentRequestPath) return null;
+    const m = currentRequestPath.match(
+      /^\/repos\/([^/]+)\/([^/]+)\/contents\/?(.*?)(?:\?.*)?$/
+    );
+    if (!m) return null;
+    const [, owner, repo, rest] = m;
+    const parts = rest ? rest.split("/").filter(Boolean) : [];
+    return { owner, repo, parts };
+  }, [currentRequestPath]);
+
+  function navigateToCrumb(idx: number) {
+    if (!crumbs || !onNavigate) return;
+    const newPath = crumbs.parts.slice(0, idx + 1).join("/");
+    // Создаём виртуальный entry для навигации
+    const synthetic: FileEntry = {
+      name: idx === -1 ? crumbs.repo : crumbs.parts[idx],
+      path: newPath,
+      type: "dir",
+    };
+    onNavigate(synthetic, currentRequestPath || "");
+  }
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+      {crumbs && (
+        <div className="files-crumbs">
+          <button
+            type="button"
+            className="files-crumb"
+            onClick={() => navigateToCrumb(-1)}
+            title={`${crumbs.owner}/${crumbs.repo}`}
+          >
+            {crumbs.repo}
+          </button>
+          {crumbs.parts.map((part, i) => (
+            <span key={i} style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+              <span style={{ color: "var(--text-muted)" }}>/</span>
+              <button
+                type="button"
+                className="files-crumb"
+                onClick={() => navigateToCrumb(i)}
+              >
+                {part}
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+      <div className="files-list">
+        {entries.map((entry) => (
+          <button
+            key={entry.path}
+            type="button"
+            className="files-entry"
+            data-type={entry.type}
+            onClick={() => onNavigate?.(entry, currentRequestPath || "")}
+            title={entry.path}
+          >
+            {entry.type === "dir" ? (
+              <Folder size={14} strokeWidth={1.6} className="files-entry-icon" />
+            ) : (
+              <FileIcon size={14} strokeWidth={1.6} className="files-entry-icon" />
+            )}
+            <span className="files-entry-name">{entry.name}</span>
+            {entry.type === "file" && entry.size !== undefined && (
+              <span className="files-entry-size">{formatBytes(entry.size)}</span>
+            )}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}

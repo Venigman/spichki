@@ -21,6 +21,8 @@ export interface RunResult {
   responseHeaders: Record<string, string>;
   /** Display URL — auth query param stripped to avoid token leakage in UI / history. */
   displayURL: string;
+  /** Path использованный в запросе (без query) — нужен File Browser'у для навигации. */
+  requestPath: string;
   error?: string;
 }
 
@@ -133,6 +135,7 @@ export async function runRequest(input: RunInput): Promise<RunResult> {
       rawText,
       responseHeaders,
       displayURL,
+      requestPath: path.split("?")[0] || path,
     };
   } catch (err: unknown) {
     const durationMs = Math.round(performance.now() - t0);
@@ -149,6 +152,7 @@ export async function runRequest(input: RunInput): Promise<RunResult> {
       rawText: message,
       responseHeaders: {},
       displayURL,
+      requestPath: path.split("?")[0] || path,
       error: message,
     };
   }

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Send, Trash2, Loader2, ChevronRight } from "lucide-react";
+import { Plus, Send, Trash2, Loader2, ChevronRight, ChevronDown } from "lucide-react";
 import { useAPIs } from "../context/APIs";
 import { runRequest, type RunResult } from "../lib/request";
 import { SmartViewer } from "./SmartViewer";
@@ -36,6 +36,9 @@ export function Workspace() {
   const [body, setBody] = useState("");
   const [result, setResult] = useState<RunResult | null>(null);
   const [running, setRunning] = useState(false);
+  // Mobile-only: Request panel can be collapsed so the user can read Response
+  // full-screen. Open by default. The toggle button only shows on mobile (CSS).
+  const [requestCollapsed, setRequestCollapsed] = useState(false);
 
   // Reset request scratchpad when API switches
   useEffect(() => {
@@ -57,6 +60,41 @@ export function Workspace() {
     [active, history]
   );
 
+  // Какие HTTP-методы реально используются в эндпоинтах текущего таба.
+  // Если эндпоинтов нет — показываем все, чтобы не лишать юзера ручных запросов.
+  // Текущий выбранный method всегда включаем (на случай если переключили таб).
+  // ВНИМАНИЕ: хуки должны быть до любого `if (!active) return` — иначе Rules of Hooks
+  // ломают render с чёрным экраном.
+  const availableMethods = useMemo<readonly Method[]>(() => {
+    if (!active?.endpoints || active.endpoints.length === 0) return METHODS;
+    const used = new Set<Method>();
+    for (const ep of active.endpoints) {
+      if ((METHODS as readonly string[]).includes(ep.method)) {
+        used.add(ep.method as Method);
+      }
+    }
+    used.add(method);
+    return METHODS.filter((m) => used.has(m));
+  }, [active, method]);
+
+  // Превью того, что улетит — короткая подсказка под path-input.
+  const sendPreview = useMemo(() => {
+    if (!body || !body.trim()) return null;
+    try {
+      const obj = JSON.parse(body);
+      if (obj && typeof obj === "object" && typeof obj.command === "string") {
+        return { kind: "command" as const, value: obj.command };
+      }
+    } catch {
+      /* not json */
+    }
+    const trimmed = body.trim().replace(/\s+/g, " ");
+    return {
+      kind: "raw" as const,
+      value: trimmed.length > 80 ? trimmed.slice(0, 80) + "…" : trimmed,
+    };
+  }, [body]);
+
   if (!active) {
     return (
       <div className="workspace">
@@ -74,23 +112,28 @@ export function Workspace() {
     );
   }
 
-  async function send() {
+  async function send(
+    override?: Partial<{ method: Method; path: string; body: string }>
+  ) {
     if (!active || running) return;
+    const useMethod = override?.method ?? method;
+    const usePath = override?.path ?? path;
+    const useBody = override?.body ?? body;
     setRunning(true);
     const res = await runRequest({
       api: active,
-      method,
-      path,
+      method: useMethod,
+      path: usePath,
       headers,
       query,
-      body,
+      body: useBody,
     });
     setResult(res);
     setRunning(false);
     pushHistory({
       apiId: active.id,
-      method,
-      path,
+      method: useMethod,
+      path: usePath,
       status: res.status,
       durationMs: res.durationMs,
     });
@@ -106,7 +149,7 @@ export function Workspace() {
           onChange={(m) => setMethod(m)}
           triggerProps={{ "data-method": method } as React.ButtonHTMLAttributes<HTMLButtonElement>}
           triggerStyle={{ color: `var(--method-${method.toLowerCase()})` }}
-          options={METHODS.map((m) => ({
+          options={availableMethods.map((m) => ({
             value: m,
             label: m,
             color: `var(--method-${m.toLowerCase()})`,
@@ -137,7 +180,7 @@ export function Workspace() {
         <button
           type="button"
           className="btn btn--primary run-btn"
-          onClick={send}
+          onClick={() => send()}
           disabled={running}
         >
           {running ? (
@@ -148,12 +191,34 @@ export function Workspace() {
           <span>{running ? "Sending…" : "Send"}</span>
         </button>
       </div>
+      {sendPreview && (
+        <div className="send-preview" data-kind={sendPreview.kind}>
+          <span className="send-preview-arrow">▶</span>
+          <span className="send-preview-value">{sendPreview.value}</span>
+        </div>
+      )}
 
       <div className="split">
-        <div className="panel">
-          <div className="panel-header">
+        <div
+          className="panel"
+          data-panel="request"
+          data-collapsed={requestCollapsed}
+        >
+          <button
+            type="button"
+            className="panel-header panel-header-toggle"
+            onClick={() => setRequestCollapsed((v) => !v)}
+            aria-expanded={!requestCollapsed}
+            aria-label={requestCollapsed ? "Развернуть запрос" : "Свернуть запрос"}
+          >
             <h3 className="panel-title">Request</h3>
-          </div>
+            <ChevronDown
+              size={16}
+              strokeWidth={2}
+              className="panel-chevron"
+              data-open={!requestCollapsed}
+            />
+          </button>
           <div className="panel-body">
             <KVSection
               label="Query parameters"
@@ -281,7 +346,7 @@ export function Workspace() {
           </div>
         </div>
 
-        <div className="panel">
+        <div className="panel" data-panel="response">
           <div className="panel-header">
             <h3 className="panel-title">Response</h3>
             {result && (
@@ -313,7 +378,22 @@ export function Workspace() {
                 </div>
               </div>
             ) : (
-              <SmartViewer data={result.data} rawText={result.rawText} />
+              <SmartViewer
+                data={result.data}
+                rawText={result.rawText}
+                currentRequestPath={result.requestPath}
+                onNavigateFile={(entry, currentPath) => {
+                  // Стратегия: меняем хвост path после `/contents/` на entry.path.
+                  // Пример: /repos/o/r/contents/src/foo + entry "src/bar"
+                  //         → /repos/o/r/contents/src/bar
+                  const m = currentPath.match(/^(\/repos\/[^/]+\/[^/]+\/contents\/)/);
+                  if (!m) return;
+                  const newPath = m[1] + entry.path;
+                  setMethod("GET");
+                  setPath(newPath);
+                  send({ method: "GET", path: newPath, body: "" });
+                }}
+              />
             )}
           </div>
         </div>
@@ -335,21 +415,49 @@ function KVSection({
   keyPlaceholder: string;
   valuePlaceholder: string;
 }) {
+  // Свёрнуто по умолчанию если пусто; авто-разворачиваем как только появилась
+  // хоть одна строка (пользователь добавил → ему явно надо её видеть).
+  const [open, setOpen] = useState(rows.length > 0);
+  useEffect(() => {
+    if (rows.length > 0 && !open) setOpen(true);
+  }, [rows.length, open]);
+
   return (
     <div className="section">
-      <div className="section-label">
-        <span>{label}</span>
+      <div
+        className="section-label"
+        style={{ cursor: "pointer", userSelect: "none" }}
+        onClick={() => setOpen(!open)}
+      >
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+          <ChevronRight
+            size={12}
+            strokeWidth={2}
+            className="preset-category-chevron"
+            data-open={open}
+          />
+          {label}
+          {rows.length > 0 && (
+            <span className="preset-category-count" style={{ height: 16, minWidth: 18, fontSize: 9 }}>
+              {rows.length}
+            </span>
+          )}
+        </span>
         <button
           type="button"
           className="btn btn--ghost"
           style={{ height: 24, padding: "0 8px", fontSize: 11 }}
-          onClick={() => onChange([...rows, { key: "", value: "" }])}
+          onClick={(e) => {
+            e.stopPropagation();
+            onChange([...rows, { key: "", value: "" }]);
+            setOpen(true);
+          }}
         >
           <Plus size={11} strokeWidth={2} />
           <span style={{ marginLeft: 2 }}>Add</span>
         </button>
       </div>
-      {rows.length === 0 ? (
+      {open && (rows.length === 0 ? (
         <div
           style={{
             fontSize: 12,
@@ -394,7 +502,7 @@ function KVSection({
             </button>
           </div>
         ))
-      )}
+      ))}
     </div>
   );
 }

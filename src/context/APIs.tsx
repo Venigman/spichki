@@ -114,6 +114,7 @@ export function APIsProvider({ children }: { children: ReactNode }) {
         if (!preset) return tab; // orphan — keep as-is
         const updated: APITab = {
           ...tab,
+          name: preset.name || tab.name,
           baseURL: preset.baseURL.replace(/\/+$/, ""),
           auth: {
             ...tab.auth,
@@ -199,7 +200,7 @@ export function APIsProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const saveSeedPreset = useCallback(async (preset: APIPreset) => {
-    // Optimistic upsert in local state, then push to /api/presets file.
+    // В local state — с токеном (юзер хочет видеть его в редакторе).
     setSeedPresets((prev) => {
       const idx = prev.findIndex((p) => p.id === preset.id);
       if (idx === -1) return [...prev, preset];
@@ -207,11 +208,17 @@ export function APIsProvider({ children }: { children: ReactNode }) {
       next[idx] = preset;
       return next;
     });
+    // На сервер (data/claude-presets.json — может попасть в публичный репо) —
+    // ВЫРЕЗАЕМ токен. Никаких секретов в файлах.
+    const safe: APIPreset = {
+      ...preset,
+      auth: { ...preset.auth, token: undefined },
+    };
     try {
       await fetch("/api/presets", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify(preset),
+        body: JSON.stringify(safe),
       });
     } catch {
       // server will reconcile on next poll

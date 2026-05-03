@@ -24,6 +24,11 @@ export interface APIPreset {
     kind: AuthKind;
     headerName?: string;
     queryName?: string;
+    /**
+     * Опциональный токен. Хранится локально (localStorage/seed-file).
+     * При экспорте через clipboard — автоматически вырезается.
+     */
+    token?: string;
   };
   defaultHeaders?: Array<{ key: string; value: string }>;
   endpoints: PresetEndpoint[];

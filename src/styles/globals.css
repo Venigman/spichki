@@ -258,10 +258,8 @@ a:hover { text-decoration: underline; }
   overflow-x: auto;
   overflow-y: hidden;
   -webkit-overflow-scrolling: touch;
-  scroll-snap-type: x proximity;
 }
 .tabstrip::-webkit-scrollbar { height: 0; }
-.tab { scroll-snap-align: start; }
 
 .tab {
   display: inline-flex;
@@ -367,6 +365,36 @@ a:hover { text-decoration: underline; }
   padding: 12px 16px;
   background: var(--bg-canvas);
   border-bottom: 1px solid var(--border-muted);
+}
+
+/* Превью «что улетит при Send» — тонкая полоса под path-input. */
+.send-preview {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 16px;
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border-muted);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.send-preview-arrow {
+  color: var(--method-get);
+  font-size: 9px;
+  flex-shrink: 0;
+}
+.send-preview-value {
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.send-preview[data-kind="command"] .send-preview-value {
+  color: var(--method-post);
+  font-weight: 600;
 }
 
 .method-select {
@@ -552,6 +580,28 @@ a:hover { text-decoration: underline; }
   flex-shrink: 0;
   height: 44px;
 }
+/* Toggle variant — looks like a regular header but acts as a button.
+   Used for the Request panel on mobile so the user can collapse it. */
+button.panel-header-toggle {
+  width: 100%;
+  border: none;
+  border-bottom: 1px solid var(--border-muted);
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+  color: inherit;
+}
+.panel-chevron {
+  color: var(--text-muted);
+  transition: transform var(--duration-base) var(--ease-out);
+  flex-shrink: 0;
+}
+.panel-chevron[data-open="false"] { transform: rotate(-90deg); }
+/* Hide the chevron on desktop — collapsing is mobile-only behavior. */
+@media (min-width: 769px) {
+  .panel-chevron { display: none; }
+  button.panel-header-toggle { cursor: default; }
+}
 .panel-title {
   font-size: var(--text-xs);
   font-weight: 600;
@@ -712,6 +762,143 @@ select.kv-input {
 .json-bool  { color: var(--method-put); }
 .json-null  { color: var(--text-muted); }
 .json-punct { color: var(--text-secondary); }
+
+/* ── Pretty view (universal human-readable response) ── */
+.pretty-text {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--text-primary);
+  white-space: pre-wrap;
+  word-break: break-word;
+  padding: 4px 0;
+}
+.pretty-root {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  color: var(--text-primary);
+  line-height: 1.55;
+}
+.pretty-object {
+  display: grid;
+  grid-template-columns: minmax(120px, max-content) 1fr;
+  gap: 4px 16px;
+}
+.pretty-row {
+  display: contents;
+}
+.pretty-key {
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--border-muted);
+}
+.pretty-value {
+  color: var(--text-primary);
+  padding: 4px 0;
+  border-bottom: 1px solid var(--border-muted);
+  word-break: break-word;
+  min-width: 0;
+}
+.pretty-row:last-child .pretty-key,
+.pretty-row:last-child .pretty-value {
+  border-bottom: none;
+}
+.pretty-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.pretty-list-item {
+  padding: 8px 12px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-muted);
+  border-radius: var(--radius-sm);
+}
+.pretty-list-item .pretty-object {
+  grid-template-columns: minmax(100px, max-content) 1fr;
+  gap: 2px 12px;
+}
+.pretty-list-item .pretty-key,
+.pretty-list-item .pretty-value {
+  border-bottom: none;
+  padding: 2px 0;
+}
+.pretty-string { color: var(--text-primary); }
+.pretty-scalar { color: var(--method-patch); font-family: var(--font-mono); font-size: 12px; }
+.pretty-muted  { color: var(--text-muted); font-style: italic; }
+
+/* ── Files browser (GitHub-style контент) ────────────── */
+.files-crumbs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 10px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-muted);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+.files-crumb {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 6px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  color: var(--text-link);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: inherit;
+}
+.files-crumb:hover {
+  background: var(--bg-overlay);
+  border-color: var(--border-muted);
+}
+.files-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  border: 1px solid var(--border-muted);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--bg-canvas);
+}
+.files-entry {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  color: var(--text-primary);
+  transition: background var(--duration-fast) var(--ease-out);
+}
+.files-entry:hover { background: var(--bg-overlay); }
+.files-entry-icon { flex-shrink: 0; }
+.files-entry[data-type="dir"] .files-entry-icon { color: var(--method-post); }
+.files-entry[data-type="file"] .files-entry-icon { color: var(--text-secondary); }
+.files-entry-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.files-entry[data-type="dir"] .files-entry-name { font-weight: 600; }
+.files-entry-size {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
 
 .response-empty {
   display: flex;
@@ -1211,15 +1398,16 @@ select.field-input {
 }
 .spin { animation: spin 0.9s linear infinite; }
 
-/* Mobile tweaks — designed for thumbs, не теряем экран на хроме */
+/* Mobile tweaks — sizes match desktop; layout flips so Response is on top
+   and Request is pinned to the bottom with its own scroll. */
 @media (max-width: 768px) {
   body { font-size: 13px; }
-  /* iOS Safari: no zoom on focus */
+  /* iOS Safari: no zoom on focus. Required — keep on inputs/textareas only,
+     not on Dropdown <button>s (handled separately). */
   input, textarea, select { font-size: 16px !important; }
 
   .topbar {
     padding: 8px 16px;
-    min-height: 48px;
     gap: 8px;
     /* respect notch */
     padding-top: max(8px, env(safe-area-inset-top, 0px));
@@ -1229,53 +1417,32 @@ select.field-input {
   }
   .brand { padding-right: 6px; margin-right: 0; }
   .brand-badge { display: none; }
+  /* Topbar buttons: keep desktop height (32). Just hide the label so we get
+     a square icon button instead of a wide one. */
   .topbar-actions .btn--secondary {
-    width: 40px;
+    width: 32px;
     padding: 0;
   }
   .topbar-actions .btn--secondary span { display: none; }
 
-  /* Mode banner: icon-only on narrow screens to save horizontal real estate */
-  .mode-banner {
-    height: 32px;
-    width: 32px;
-    padding: 0;
-    justify-content: center;
-  }
   .mode-banner-label { display: none; }
+  .mode-banner { width: 28px; padding: 0; justify-content: center; }
 
-  /* Tabstrip stays scrollable horizontally + safe-area for landscape notch */
+  /* Tabstrip — same height + same gap as desktop, stays scrollable horizontally. */
   .tabstrip {
-    padding: 6px 16px;
-    gap: 2px;
-    min-height: 56px;
     padding-left: max(16px, env(safe-area-inset-left, 0px));
     padding-right: max(16px, env(safe-area-inset-right, 0px));
   }
-  .tab {
-    height: 40px;
-    padding: 8px 12px;
-    font-size: 13px;
-  }
-  /* Tab close: bigger hit area without growing the tab vertically */
-  .tab-close {
-    width: 28px;
-    height: 28px;
-    margin: -6px -6px -6px 2px;
-  }
+
+  /* Tab close: bigger hit area without growing the tab vertically. */
   .tab-close[data-confirming="true"] {
     background: rgba(248, 81, 73, 0.15);
     color: var(--status-high);
   }
-  .tab-add {
-    width: 40px;
-    height: 40px;
-    /* keep the same flex-end + top:1px from desktop so it aligns with tabs */
-  }
 
-  /* Runner: wrap path onto its own row so method+send stay reachable */
+  /* Runner — same heights as desktop; keep flex-wrap so the path drops to
+     its own row when needed. */
   .runner {
-    padding: 10px 16px;
     flex-wrap: wrap;
     gap: 8px;
     padding-left: max(16px, env(safe-area-inset-left, 0px));
@@ -1285,64 +1452,72 @@ select.field-input {
   .path-input {
     flex: 1 1 100%;
     order: 3;
-    height: 40px;
-    font-size: 13px;
+    /* iOS-zoom protection forces 16px font here; 32px would clip the text,
+       so this is the one input we let stay slightly taller than desktop. */
+    height: 36px;
+    scroll-margin-bottom: 30vh;
   }
-  .runner > .method-select { order: 1; height: 40px; }
-  .runner > .run-btn { order: 2; min-height: 40px; }
+  .runner > .method-select { order: 1; }
+  .runner > .run-btn { order: 2; }
 
-  .btn { min-height: 40px; }
-  .icon-btn { width: 40px; height: 40px; }
+  /* ── Workspace: Response on top, Request pinned at bottom ──
+     Layout: response = 1fr (fills), request = fixed 45vh, scrolls inside. */
+  .workspace { overflow: hidden; }
+  .split {
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr auto;
+  }
+  .panel[data-panel="response"] { order: 1; min-height: 0; }
+  .panel[data-panel="request"]  {
+    order: 2;
+    height: 45vh;
+    min-height: 0;
+    border-top: 1px solid var(--border);
+    background: var(--bg-surface);
+    transition: height var(--duration-base) var(--ease-out);
+  }
+  /* Collapsed Request: just the toggle header is visible; Response gets the
+     full screen. Body is hidden so panel content doesn't peek through. */
+  .panel[data-panel="request"][data-collapsed="true"] {
+    height: 44px;
+  }
+  .panel[data-panel="request"][data-collapsed="true"] .panel-body {
+    display: none;
+  }
+  /* The default ".panel + .panel" left border / top border isn't right with
+     order swap — clear it; we set the divider on the request panel above. */
+  .panel + .panel { border-left: none; border-top: none; }
 
-  /* Stack request/response panels vertically below 900px (already in .split) */
-  .split { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
-  .panel + .panel { border-left: none; border-top: 1px solid var(--border); }
-
-  /* Sticky panel headers on mobile — fixed height matches desktop, allows wrap */
   .panel-header {
     position: sticky;
     top: 0;
     z-index: 5;
-    height: 48px;
-    padding: 0 16px;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
   }
   .panel-body {
-    padding: 12px 16px calc(20px + env(safe-area-inset-bottom, 0px));
     overscroll-behavior: contain;
+    padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
   }
-
-  /* KV rows wrap to two lines on tiny widths */
-  .kv-row {
-    grid-template-columns: 1fr 40px;
-    grid-template-areas:
-      "key  remove"
-      "val  remove";
-    gap: 6px;
-  }
-  .kv-row > .kv-input:nth-child(1) { grid-area: key; }
-  .kv-row > .kv-input:nth-child(2) { grid-area: val; }
-  .kv-row > .kv-remove { grid-area: remove; height: 100%; min-height: 40px; }
-  .kv-input { height: 38px; font-size: 13px; }
-
   .page-header-row {
-    padding: 8px var(--sp-4);
-    padding-left: max(var(--sp-4), env(safe-area-inset-left, 0px));
-    padding-right: max(var(--sp-4), env(safe-area-inset-right, 0px));
-    min-height: 56px;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
   }
   .page-body {
-    padding: var(--sp-4);
-    padding-bottom: calc(var(--sp-6) + env(safe-area-inset-bottom, 0px));
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
   }
-  .page-title { font-size: var(--text-md); }
+
+  /* KV inputs: same shape as desktop. The height is bumped slightly so the
+     iOS-zoom 16px font still fits. No two-row stacking, no full-height
+     remove button. */
+  .kv-input { height: 32px; }
 
   .body-textarea {
-    font-size: 13px;
-    min-height: 180px;
-    /* Make iOS scroll the textarea above the keyboard when focused */
-    scroll-margin-bottom: 30vh;
-  }
-  .path-input {
+    /* Make iOS scroll the textarea above the keyboard when focused. */
     scroll-margin-bottom: 30vh;
   }
 
@@ -1353,7 +1528,7 @@ select.field-input {
     border-radius: var(--radius-xl) var(--radius-xl) 0 0;
     margin-bottom: 0;
     overflow-y: auto;
-    /* Drag-handle indicator: visual cue that this is dismissible */
+    /* Drag-handle indicator: visual cue that this is dismissible. */
     padding-top: 12px;
   }
   .modal::before {
@@ -1369,12 +1544,9 @@ select.field-input {
     align-items: flex-end;
     padding: 0;
   }
-  .modal-header { padding: 18px 16px 12px; }
-  .modal-body { padding: 16px 16px 12px; }
-  .modal-footer { padding: 12px 16px calc(16px + env(safe-area-inset-bottom, 0px)); }
-  .field-input { height: 40px; }
+  .modal-footer { padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px)); }
 
-  /* Response area: allow long URLs and tokens to wrap softly */
+  /* Response area: allow long URLs and tokens to wrap softly. */
   .response-area {
     word-break: break-word;
     overflow-wrap: anywhere;
