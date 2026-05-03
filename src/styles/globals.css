@@ -371,34 +371,61 @@ a:hover { text-decoration: underline; }
    совпадающий с другими endpoint'ами. Клик — подставляет полную команду. */
 .cmd-suggest {
   display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  padding: 6px 16px 0;
+  flex-direction: column;
+  gap: 1px;
+  padding: 4px 16px 0;
   background: var(--bg-canvas);
+  max-height: 280px;
+  overflow-y: auto;
 }
 .cmd-suggest-item {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 4px 8px;
-  background: var(--bg-elevated);
+  gap: 8px;
+  padding: 6px 8px;
+  background: transparent;
   color: var(--text-primary);
-  border: 1px solid var(--border-muted);
-  border-radius: 6px;
-  font: 11px/1.2 var(--font-mono, ui-monospace, "SF Mono", Menlo, monospace);
+  border: 1px solid transparent;
+  border-radius: 4px;
+  font: 12px/1.2 var(--font-mono, ui-monospace, "SF Mono", Menlo, monospace);
   cursor: pointer;
   user-select: none;
+  text-align: left;
+  width: 100%;
 }
 .cmd-suggest-item:hover {
-  border-color: var(--border-strong);
-  background: var(--bg-canvas);
+  background: var(--bg-elevated);
+  border-color: var(--border-muted);
 }
+.cmd-suggest-method {
+  flex: 0 0 auto;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: var(--bg-elevated);
+  color: var(--text-muted);
+  min-width: 30px;
+  text-align: center;
+}
+.cmd-suggest-method[data-method="GET"]    { color: var(--method-get); }
+.cmd-suggest-method[data-method="POST"]   { color: var(--method-post); }
+.cmd-suggest-method[data-method="PUT"]    { color: var(--method-put); }
+.cmd-suggest-method[data-method="DELETE"] { color: var(--method-delete); }
+.cmd-suggest-method[data-method="PATCH"]  { color: var(--method-patch); }
 .cmd-suggest-cmd {
+  flex: 1 1 auto;
   color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .cmd-suggest-label {
+  flex: 0 0 auto;
   color: var(--text-muted);
   font-size: 10px;
+  font-family: var(--font-base, system-ui);
 }
 
 /* Превью «что улетит при Send» — тонкая полоса под path-input. */

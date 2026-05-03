@@ -123,24 +123,31 @@ interface Props {
   apiToken?: string;
 }
 
-/** Возвращает media-ссылку для рендера если ответ ноды содержит kind+filename. */
+/** Возвращает media-ссылку если ответ ноды содержит filename и либо kind,
+ *  либо url начинающийся с /api/media/<kind>/. */
 function detectMedia(value: unknown): { kind: string; filename: string; relPath: string } | null {
   if (!value || typeof value !== "object") return null;
   const v = value as Record<string, unknown>;
-  // veni-detect формат: {ok, result: {kind, filename, ...}}
+  // veni-detect формат: {ok, result: {kind?, filename, url?, ...}}
   let inner: Record<string, unknown> = v;
   if (typeof v.result === "object" && v.result !== null) {
     inner = v.result as Record<string, unknown>;
   }
-  const kind = inner.kind as string | undefined;
   const filename = inner.filename as string | undefined;
-  if (typeof kind !== "string" || typeof filename !== "string") return null;
+  if (typeof filename !== "string") return null;
+  let kind = inner.kind as string | undefined;
+  let relPath = inner.url as string | undefined;
+  // Если в JSON есть url типа /api/media/audio/X.wav — выводим kind из него.
+  if (typeof relPath === "string") {
+    const m = relPath.match(/^\/api\/media\/([^/]+)\//);
+    if (m && !kind) kind = m[1];
+  }
+  if (typeof kind !== "string") return null;
   if (!["cam", "screen", "audio", "file"].includes(kind)) return null;
-  return {
-    kind,
-    filename,
-    relPath: `/api/media/${encodeURIComponent(kind)}/${encodeURIComponent(filename)}`,
-  };
+  if (!relPath || !relPath.startsWith("/api/media/")) {
+    relPath = `/api/media/${encodeURIComponent(kind)}/${encodeURIComponent(filename)}`;
+  }
+  return { kind, filename, relPath };
 }
 
 function mimeFromName(name: string): { kind: "image" | "video" | "audio" | "pdf" | "text" | "other"; mime: string } {

@@ -81,31 +81,47 @@ export function Workspace() {
     return METHODS.filter((m) => used.has(m));
   }, [active, method]);
 
-  // Авто-подсказки команд: ищем в endpoints пресета те, у которых body.command
-  // начинается с того что юзер сейчас пишет. Например пишет "/devices" →
-  // показываем "/devices online", "/devices offline", "/devices banned".
+  // Live-search по командам пресета: substring match по cmd/path/label.
+  // Активен всегда когда path не пуст. Результаты сортируются: точное совпадение
+  // → startsWith → includes. Лимит 8. Помогает находить команды по 1-2 буквам.
   const cmdSuggestions = useMemo(() => {
-    if (!commandEndpoint || !path || !active?.endpoints) return [];
-    const trimmed = path.trim();
-    if (trimmed.length < 1) return [];
-    const out: { ep: SavedEndpoint; cmd: string }[] = [];
+    if (!path || !active?.endpoints) return [];
+    const q = path.trim().toLowerCase();
+    if (q.length < 1) return [];
+    type S = { ep: SavedEndpoint; cmd: string; score: number };
+    const out: S[] = [];
     for (const ep of active.endpoints) {
-      if (ep.method !== "POST" || typeof ep.body !== "string") continue;
-      let cmd: string;
-      try {
-        const obj = JSON.parse(ep.body);
-        if (typeof obj?.command !== "string") continue;
-        cmd = obj.command;
-      } catch {
-        continue;
+      // Достаём то по чему ищем: для POST с command — body.command,
+      // для остальных — ep.path.
+      let cmd: string = ep.path;
+      let isCmd = false;
+      if (ep.method === "POST" && typeof ep.body === "string") {
+        try {
+          const obj = JSON.parse(ep.body);
+          if (typeof obj?.command === "string") {
+            cmd = obj.command;
+            isCmd = true;
+          }
+        } catch {
+          /* not json — fall back to path */
+        }
       }
-      if (cmd === trimmed) continue;
-      if (!cmd.startsWith(trimmed)) continue;
-      out.push({ ep, cmd });
-      if (out.length >= 8) break;
+      const lcmd = cmd.toLowerCase();
+      const llabel = ep.label.toLowerCase();
+      // Точное совпадение — пропускаем (юзер уже на этой команде).
+      if (lcmd === q) continue;
+      // Релевантность: чем меньше score — тем выше в списке.
+      let score: number;
+      if (lcmd.startsWith(q)) score = 0;
+      else if (llabel.startsWith(q)) score = 1;
+      else if (lcmd.includes(q)) score = 2;
+      else if (llabel.includes(q)) score = 3;
+      else continue;
+      out.push({ ep, cmd, score, isCmd } as S & { isCmd: boolean });
     }
-    return out;
-  }, [path, active, commandEndpoint]);
+    out.sort((a, b) => a.score - b.score || a.cmd.localeCompare(b.cmd));
+    return out.slice(0, 8) as (S & { isCmd: boolean })[];
+  }, [path, active]);
 
   // Превью того, что улетит — короткая подсказка под path-input.
   const sendPreview = useMemo(() => {
@@ -240,19 +256,29 @@ export function Workspace() {
       </div>
       {cmdSuggestions.length > 0 && (
         <div className="cmd-suggest">
-          {cmdSuggestions.map(({ ep, cmd }) => (
+          {cmdSuggestions.map(({ ep, cmd, isCmd }) => (
             <button
               key={ep.label + cmd}
               type="button"
               className="cmd-suggest-item"
               onClick={() => {
-                setMethod("POST");
-                setPath(cmd);
-                setBody("");
-                setCommandEndpoint({ path: ep.path, bodyTemplate: ep.body || "" });
+                if (isCmd) {
+                  setMethod("POST");
+                  setPath(cmd);
+                  setBody("");
+                  setCommandEndpoint({ path: ep.path, bodyTemplate: ep.body || "" });
+                } else {
+                  setMethod(ep.method as Method);
+                  setPath(ep.path);
+                  setBody(ep.body || "");
+                  setCommandEndpoint(null);
+                }
               }}
               title={ep.label}
             >
+              <span className="cmd-suggest-method" data-method={isCmd ? "POST" : ep.method}>
+                {isCmd ? "/" : ep.method}
+              </span>
               <span className="cmd-suggest-cmd">{cmd}</span>
               <span className="cmd-suggest-label">{ep.label}</span>
             </button>
