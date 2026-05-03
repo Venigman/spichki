@@ -234,7 +234,7 @@ export function Workspace() {
               keyPlaceholder="header"
               valuePlaceholder="value"
             />
-            {query.length === 0 && headers.length === 0 && (
+            {(query.length === 0 || headers.length === 0) && (
               <div
                 style={{
                   display: "flex",
@@ -244,24 +244,28 @@ export function Workspace() {
                   padding: "4px 0",
                 }}
               >
-                <button
-                  type="button"
-                  className="btn btn--ghost"
-                  style={{ height: 22, padding: "0 8px", fontSize: 11 }}
-                  onClick={() => setQuery([{ key: "", value: "" }])}
-                >
-                  <Plus size={10} strokeWidth={2} />
-                  <span style={{ marginLeft: 2 }}>Query</span>
-                </button>
-                <button
-                  type="button"
-                  className="btn btn--ghost"
-                  style={{ height: 22, padding: "0 8px", fontSize: 11 }}
-                  onClick={() => setHeaders([{ key: "", value: "" }])}
-                >
-                  <Plus size={10} strokeWidth={2} />
-                  <span style={{ marginLeft: 2 }}>Header</span>
-                </button>
+                {query.length === 0 && (
+                  <button
+                    type="button"
+                    className="btn btn--ghost"
+                    style={{ height: 22, padding: "0 8px", fontSize: 11 }}
+                    onClick={() => setQuery([{ key: "", value: "" }])}
+                  >
+                    <Plus size={10} strokeWidth={2} />
+                    <span style={{ marginLeft: 2 }}>Query</span>
+                  </button>
+                )}
+                {headers.length === 0 && (
+                  <button
+                    type="button"
+                    className="btn btn--ghost"
+                    style={{ height: 22, padding: "0 8px", fontSize: 11 }}
+                    onClick={() => setHeaders([{ key: "", value: "" }])}
+                  >
+                    <Plus size={10} strokeWidth={2} />
+                    <span style={{ marginLeft: 2 }}>Header</span>
+                  </button>
+                )}
               </div>
             )}
             {(method === "POST" || method === "PUT" || method === "PATCH" || method === "DELETE") && (
