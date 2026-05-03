@@ -191,6 +191,20 @@ export function Workspace() {
           <span>{running ? "Sending…" : "Send"}</span>
         </button>
       </div>
+      {(method === "POST" || method === "PUT" || method === "PATCH" || method === "DELETE") && (
+        <div className="runner-body">
+          <textarea
+            className="runner-body-input"
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+            placeholder='{"command":"/status"}'
+            spellCheck={false}
+            autoCapitalize="off"
+            autoCorrect="off"
+            rows={2}
+          />
+        </div>
+      )}
       {sendPreview && (
         <div className="send-preview" data-kind={sendPreview.kind}>
           <span className="send-preview-arrow">▶</span>
