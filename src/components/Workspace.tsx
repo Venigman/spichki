@@ -190,9 +190,7 @@ export function Workspace() {
           )}
           <span>{running ? "Sending…" : "Send"}</span>
         </button>
-      </div>
-      {(method === "POST" || method === "PUT" || method === "PATCH" || method === "DELETE") && (
-        <div className="runner-body">
+        {(method === "POST" || method === "PUT" || method === "PATCH" || method === "DELETE") && (
           <textarea
             className="runner-body-input"
             value={body}
@@ -203,8 +201,8 @@ export function Workspace() {
             autoCorrect="off"
             rows={2}
           />
-        </div>
-      )}
+        )}
+      </div>
       {sendPreview && (
         <div className="send-preview" data-kind={sendPreview.kind}>
           <span className="send-preview-arrow">▶</span>

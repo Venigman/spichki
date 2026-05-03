@@ -367,16 +367,14 @@ a:hover { text-decoration: underline; }
   border-bottom: 1px solid var(--border-muted);
 }
 
-/* Inline body-input под runner для POST/PUT/PATCH/DELETE — чтобы не лазить
-   в свёрнутый Request-аккордеон каждый раз на телефоне. */
-.runner-body {
-  padding: 8px 16px 0;
-  background: var(--bg-canvas);
-}
+/* Body-textarea внутри .runner: переходит на свою строку через flex-basis,
+   без отдельной обёртки. Лежит вплотную под path-input. */
+.runner { flex-wrap: wrap; }
 .runner-body-input {
-  width: 100%;
-  min-height: 44px;
+  flex: 1 1 100%;
+  min-height: 40px;
   padding: 8px 10px;
+  margin-top: 4px;
   background: var(--bg-elevated);
   color: var(--text-primary);
   border: 1px solid var(--border-muted);
