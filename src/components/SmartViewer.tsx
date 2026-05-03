@@ -27,11 +27,34 @@ interface FileEntry {
   size?: number;
 }
 
-/** Распознаём GitHub-style файловый листинг (массив объектов с type/name/path). */
+/** Распознаём листинг файлов. Поддерживаем два формата:
+ *  1) GitHub-style: массив объектов с type/name/path на верхнем уровне
+ *  2) veni-detect /files /browse: {result: {items: [{name, path, is_dir, size_bytes}]}} */
 function findFileListing(value: unknown): FileEntry[] | null {
-  if (!Array.isArray(value) || value.length === 0) return null;
-  const entries: FileEntry[] = [];
-  for (const item of value) {
+  // 1. Прямой массив с GitHub-полями (type)
+  if (Array.isArray(value)) return _parseGithubListing(value);
+  // 2. Поиск items в value.result.items или value.items (наша нода)
+  if (value && typeof value === "object") {
+    const v = value as Record<string, unknown>;
+    let items: unknown = v.items;
+    if (!Array.isArray(items) && v.result && typeof v.result === "object") {
+      items = (v.result as Record<string, unknown>).items;
+    }
+    if (Array.isArray(items)) {
+      // Сначала пробуем GitHub-формат
+      const gh = _parseGithubListing(items);
+      if (gh) return gh;
+      // Иначе — наша нода: name/path/is_dir
+      return _parseNodeListing(items);
+    }
+  }
+  return null;
+}
+
+function _parseGithubListing(arr: unknown[]): FileEntry[] | null {
+  if (arr.length === 0) return null;
+  const out: FileEntry[] = [];
+  for (const item of arr) {
     if (!item || typeof item !== "object") return null;
     const obj = item as Record<string, unknown>;
     if (
@@ -41,14 +64,35 @@ function findFileListing(value: unknown): FileEntry[] | null {
     ) {
       return null;
     }
-    entries.push({
+    out.push({
       name: obj.name,
       path: obj.path,
       type: obj.type,
       size: typeof obj.size === "number" ? obj.size : undefined,
     });
   }
-  // Папки сверху, потом файлы — алфавитный порядок.
+  return _sortListing(out);
+}
+
+function _parseNodeListing(arr: unknown[]): FileEntry[] | null {
+  if (arr.length === 0) return null;
+  const out: FileEntry[] = [];
+  for (const item of arr) {
+    if (!item || typeof item !== "object") return null;
+    const obj = item as Record<string, unknown>;
+    if (typeof obj.name !== "string" || typeof obj.path !== "string") return null;
+    if (typeof obj.is_dir !== "boolean") return null;
+    out.push({
+      name: obj.name,
+      path: obj.path,
+      type: obj.is_dir ? "dir" : "file",
+      size: typeof obj.size_bytes === "number" ? obj.size_bytes : undefined,
+    });
+  }
+  return _sortListing(out);
+}
+
+function _sortListing(entries: FileEntry[]): FileEntry[] {
   entries.sort((a, b) => {
     if (a.type === "dir" && b.type !== "dir") return -1;
     if (a.type !== "dir" && b.type === "dir") return 1;
@@ -152,6 +196,40 @@ function detectMedia(value: unknown): { kind: string; filename: string; relPath:
   return { kind, filename, relPath };
 }
 
+/** Детектит массив media-items — например ответ /media list audio:
+ *  result.items = [{filename, kind, url, size_bytes, ...}, ...]
+ *  Возвращает массив relPath+filename+kind или null. */
+function detectMediaList(value: unknown): { kind: string; filename: string; relPath: string; size?: number }[] | null {
+  if (!value || typeof value !== "object") return null;
+  const v = value as Record<string, unknown>;
+  let arr: unknown = (v as Record<string, unknown>).items;
+  if (!Array.isArray(arr) && typeof v.result === "object" && v.result !== null) {
+    arr = (v.result as Record<string, unknown>).items;
+  }
+  if (!Array.isArray(arr) || arr.length === 0) return null;
+  const out: { kind: string; filename: string; relPath: string; size?: number }[] = [];
+  for (const item of arr) {
+    if (!item || typeof item !== "object") return null;
+    const obj = item as Record<string, unknown>;
+    const filename = obj.filename as string | undefined;
+    if (typeof filename !== "string") return null;
+    let kind = obj.kind as string | undefined;
+    let relPath = obj.url as string | undefined;
+    if (typeof relPath === "string") {
+      const m = relPath.match(/^\/api\/media\/([^/]+)\//);
+      if (m && !kind) kind = m[1];
+    }
+    if (typeof kind !== "string") return null;
+    if (!["cam", "screen", "audio", "file"].includes(kind)) return null;
+    if (!relPath || !relPath.startsWith("/api/media/")) {
+      relPath = `/api/media/${encodeURIComponent(kind)}/${encodeURIComponent(filename)}`;
+    }
+    const size = typeof obj.size_bytes === "number" ? obj.size_bytes : undefined;
+    out.push({ kind, filename, relPath, size });
+  }
+  return out.length > 0 ? out : null;
+}
+
 function mimeFromName(name: string): { kind: "image" | "video" | "audio" | "pdf" | "text" | "other"; mime: string } {
   const ext = name.split(".").pop()?.toLowerCase() || "";
   const map: Record<string, { kind: "image" | "video" | "audio" | "pdf" | "text"; mime: string }> = {
@@ -195,24 +273,27 @@ export function SmartViewer({
   const fileContent = useMemo(() => findFileContent(data), [data]);
   const fileListing = useMemo(() => findFileListing(data), [data]);
   const media = useMemo(() => detectMedia(data), [data]);
+  const mediaList = useMemo(() => detectMediaList(data), [data]);
   const hasPretty =
     humanText !== null ||
     (data !== null &&
       data !== undefined &&
       (typeof data === "object" || typeof data === "string"));
-  // Приоритет открытия: media → file → files → pretty → table → tree.
+  // Приоритет: media (одиночный) → mediaList → file → files → pretty → table → tree.
   const [mode, setMode] = useState<ViewMode>(
     media && apiBaseURL
       ? "media"
-      : fileContent
-        ? "file"
-        : fileListing
-          ? "files"
-          : humanText
-            ? "pretty"
-            : primaryArray
-              ? "table"
-              : "tree"
+      : mediaList && apiBaseURL
+        ? "media"
+        : fileContent
+          ? "file"
+          : fileListing
+            ? "files"
+            : humanText
+              ? "pretty"
+              : primaryArray
+                ? "table"
+                : "tree"
   );
 
   const tabs: { id: ViewMode; label: string; icon: React.ReactNode; show: boolean }[] = [
@@ -220,7 +301,7 @@ export function SmartViewer({
       id: "media",
       label: "Media",
       icon: <ImageIcon size={13} strokeWidth={1.6} />,
-      show: !!media && !!apiBaseURL,
+      show: (!!media || !!mediaList) && !!apiBaseURL,
     },
     {
       id: "file",
@@ -294,6 +375,13 @@ export function SmartViewer({
           token={apiToken}
           relPath={media.relPath}
           filename={media.filename}
+        />
+      )}
+      {mode === "media" && !media && mediaList && apiBaseURL && (
+        <MediaListView
+          baseURL={apiBaseURL}
+          token={apiToken}
+          items={mediaList}
         />
       )}
       {mode === "file" && fileContent && <FileView file={fileContent} />}
@@ -1087,4 +1175,100 @@ function fmtTime(sec: number): string {
   const m = Math.floor(sec / 60);
   const s = Math.floor(sec % 60);
   return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
+/* ─────────────────────────────────────────────
+   MEDIA LIST — карточки всех файлов из ответа
+   /media list. Аудио — мини-плеер inline,
+   image — превью, остальное — кнопка Open/Скачать.
+   ───────────────────────────────────────────── */
+function MediaListView({
+  baseURL,
+  token,
+  items,
+}: {
+  baseURL: string;
+  token?: string;
+  items: { kind: string; filename: string; relPath: string; size?: number }[];
+}) {
+  const [expanded, setExpanded] = useState<string | null>(null);
+  return (
+    <div className="media-list">
+      {items.map((it) => {
+        const meta = mimeFromName(it.filename);
+        const isOpen = expanded === it.relPath;
+        return (
+          <div key={it.relPath} className="media-list-item">
+            <div className="media-list-row">
+              <span className="media-list-kind" data-kind={it.kind}>{it.kind}</span>
+              <span className="media-list-name" title={it.filename}>{it.filename}</span>
+              <span className="media-list-size">
+                {it.size != null ? formatBytes(it.size) : ""}
+              </span>
+              <button
+                type="button"
+                className="btn btn--ghost"
+                style={{ height: 24, padding: "0 8px", fontSize: 11 }}
+                onClick={() => setExpanded(isOpen ? null : it.relPath)}
+              >
+                {isOpen ? "Закрыть" : "Открыть"}
+              </button>
+            </div>
+            {isOpen && (
+              <div style={{ marginTop: 8 }}>
+                <MediaView
+                  baseURL={baseURL}
+                  token={token}
+                  relPath={it.relPath}
+                  filename={it.filename}
+                />
+              </div>
+            )}
+            {!isOpen && meta.kind === "audio" && (
+              <div style={{ marginTop: 6 }}>
+                <InlineAudio baseURL={baseURL} token={token} relPath={it.relPath} />
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/** Авто-загруженный мини-плеер для аудио — без кнопки «открыть». */
+function InlineAudio({
+  baseURL,
+  token,
+  relPath,
+}: {
+  baseURL: string;
+  token?: string;
+  relPath: string;
+}) {
+  const [blobUrl, setBlobUrl] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    let url: string | null = null;
+    const ac = new AbortController();
+    const full = baseURL.replace(/\/+$/, "") + relPath;
+    fetch(full, {
+      signal: ac.signal,
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    })
+      .then((r) => r.blob())
+      .then((b) => {
+        if (cancelled) return;
+        url = URL.createObjectURL(b);
+        setBlobUrl(url);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+      ac.abort();
+      if (url) URL.revokeObjectURL(url);
+    };
+  }, [baseURL, token, relPath]);
+  if (!blobUrl) return null;
+  return <AudioPlayer src={blobUrl} />;
 }
