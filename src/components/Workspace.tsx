@@ -234,6 +234,36 @@ export function Workspace() {
               keyPlaceholder="header"
               valuePlaceholder="value"
             />
+            {query.length === 0 && headers.length === 0 && (
+              <div
+                style={{
+                  display: "flex",
+                  gap: 8,
+                  fontSize: 11,
+                  color: "var(--text-muted)",
+                  padding: "4px 0",
+                }}
+              >
+                <button
+                  type="button"
+                  className="btn btn--ghost"
+                  style={{ height: 22, padding: "0 8px", fontSize: 11 }}
+                  onClick={() => setQuery([{ key: "", value: "" }])}
+                >
+                  <Plus size={10} strokeWidth={2} />
+                  <span style={{ marginLeft: 2 }}>Query</span>
+                </button>
+                <button
+                  type="button"
+                  className="btn btn--ghost"
+                  style={{ height: 22, padding: "0 8px", fontSize: 11 }}
+                  onClick={() => setHeaders([{ key: "", value: "" }])}
+                >
+                  <Plus size={10} strokeWidth={2} />
+                  <span style={{ marginLeft: 2 }}>Header</span>
+                </button>
+              </div>
+            )}
             {(method === "POST" || method === "PUT" || method === "PATCH" || method === "DELETE") && (
               <div className="section">
                 <div className="section-label">
@@ -415,12 +445,16 @@ function KVSection({
   keyPlaceholder: string;
   valuePlaceholder: string;
 }) {
-  // Свёрнуто по умолчанию если пусто; авто-разворачиваем как только появилась
-  // хоть одна строка (пользователь добавил → ему явно надо её видеть).
-  const [open, setOpen] = useState(rows.length > 0);
+  // Hooks ВСЕГДА на верхнем уровне (Rules of Hooks). Early return ниже.
+  const [open, setOpen] = useState(true);
   useEffect(() => {
+    // когда добавили строку — раскрываем
     if (rows.length > 0 && !open) setOpen(true);
   }, [rows.length, open]);
+
+  // Если пусто — не рендерим вообще: на телефоне эти секции забирают высоту.
+  // Юзер добавит через кнопки "Query"/"Header" под body.
+  if (rows.length === 0) return null;
 
   return (
     <div className="section">
