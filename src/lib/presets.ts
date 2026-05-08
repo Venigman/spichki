@@ -80,7 +80,7 @@ export const PRESET_CATEGORIES: PresetCategory[] = [
 export const PRESETS: APIPreset[] = [
 ];
 
-const USER_PRESETS_KEY = "veni.userPresets.v1";
+const USER_PRESETS_KEY = "hub.userPresets.v1";
 
 export function loadUserPresets(): APIPreset[] {
   try {

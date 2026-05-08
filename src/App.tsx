@@ -25,7 +25,7 @@ function Shell() {
       <div className="topbar">
         <div className="brand">
           <span className="brand-icon">V</span>
-          <span className="brand-name">VENI</span>
+          <span className="brand-name">hub</span>
           <span className="brand-badge">v0.1</span>
         </div>
         <ModeBanner />

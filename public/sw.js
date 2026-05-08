@@ -1,15 +1,15 @@
 /**
- * VENI service worker — минимальный stale-while-revalidate.
+ * hub service worker — минимальный stale-while-revalidate.
  *
  * Обновление: меняем CACHE_VERSION при каждом релизе, старые кэши
  * автоматически вычищаются в `activate`. На первом обращении тянет
  * из сети и сохраняет; следующее обращение отдаёт кэш и обновляет
  * фоном — поэтому юзер не ждёт сети, а получает свежее на след. визите.
  */
-const CACHE_VERSION = "veni-v4";
+const CACHE_VERSION = "hub-v1";
 
 // Базовый scope — директория где зарегистрирован SW. На корневом
-// домене это "/", на subpath (типа GitHub Pages /veni-hub/) — "/veni-hub/".
+// домене это "/", на subpath (типа GitHub Pages /hub/) — "/hub/".
 const SCOPE = new URL("./", self.location).pathname;
 const APP_SHELL = [SCOPE, SCOPE + "manifest.webmanifest"];
 

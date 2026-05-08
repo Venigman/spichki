@@ -56,7 +56,7 @@ function send(res: ServerResponse, status: number, body: unknown) {
 
 /**
  * Tiny JSON-over-HTTP API used by Claude (running in another process via curl)
- * to manage VENI presets without blowing away the whole file.
+ * to manage hub presets without blowing away the whole file.
  *
  * Whole-preset ops:
  *   GET    /api/presets                       — list
@@ -78,7 +78,7 @@ function send(res: ServerResponse, status: number, body: unknown) {
  */
 export default defineConfig({
   // Relative paths so the build works both at site root and at a subpath
-  // like /veni-hub/ (GitHub Pages serves project repos from a subpath).
+  // like /hub/ (GitHub Pages serves project repos from a subpath).
   base: "./",
   plugins: [
     react(),

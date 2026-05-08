@@ -1,6 +1,6 @@
 {
-  "name": "VENI — Universal API Hub",
-  "short_name": "VENI",
+  "name": "hub — Universal API Hub",
+  "short_name": "hub",
   "description": "Универсальный пульт для любого HTTP API: пресеты, категории, действия в одно касание.",
   "start_url": ".",
   "scope": ".",

@@ -40,9 +40,9 @@ export interface HistoryItem {
   at: number;
 }
 
-const APIS_KEY = "veni.apis.v1";
-const ACTIVE_KEY = "veni.activeId.v1";
-const HISTORY_KEY = "veni.history.v1";
+const APIS_KEY = "hub.apis.v1";
+const ACTIVE_KEY = "hub.activeId.v1";
+const HISTORY_KEY = "hub.history.v1";
 
 export function loadAPIs(): APITab[] {
   try {

@@ -7,9 +7,9 @@
  */
 import type { APIPreset, PresetEndpoint } from "./presets";
 
-const KEY_STORAGE = "veni.ai.key.v1";
-const PROVIDER_STORAGE = "veni.ai.provider.v1";
-const MODEL_STORAGE = "veni.ai.model.v1";
+const KEY_STORAGE = "hub.ai.key.v1";
+const PROVIDER_STORAGE = "hub.ai.provider.v1";
+const MODEL_STORAGE = "hub.ai.model.v1";
 
 export type AIProvider = "anthropic";
 
@@ -147,7 +147,7 @@ export async function generatePreset(opts: GenerateOptions): Promise<{
     },
   ];
 
-  const systemPrompt = `Ты — помощник по созданию пресетов для VENI (универсального API-клиента).
+  const systemPrompt = `Ты — помощник по созданию пресетов для hub (универсального API-клиента).
 
 Юзер подключил API: **${opts.apiName}**
 - baseURL: ${opts.baseURL}

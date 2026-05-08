@@ -106,7 +106,7 @@ export function PresetsPage() {
   function exportAll() {
     void copyToClipboard(
       {
-        kind: "veni-presets",
+        kind: "hub-presets",
         version: 1,
         exportedAt: new Date().toISOString(),
         presets: userPresets,
