@@ -326,10 +326,10 @@
   }
 
   function bottomPos(id) {
-    const totalW = TOTAL * matchW;
+    const totalW = TOTAL * matchW + (TOTAL - 1) * intraGap;
     const startX = (viewW - totalW) / 2;
     return {
-      x: startX + id * matchW,
+      x: startX + id * (matchW + intraGap),
       y: viewH - visible - safeBottom
     };
   }
