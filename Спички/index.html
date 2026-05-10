@@ -61,7 +61,7 @@
     top: 0;
     left: 0;
     width: var(--match-w);
-    height: calc(var(--match-w) * 14);
+    height: calc(var(--match-w) * 17);
     transform: translate3d(0, 0, 0);
     transition: transform 540ms cubic-bezier(0.22, 1, 0.36, 1);
     will-change: transform;
@@ -255,9 +255,10 @@
   const RESET_HOLD_MS = 1000;
 
   // base geometry — scales down on narrow viewports
-  const BASE_MATCH_W = 12;
-  const BASE_INTRA_GAP = 4;
-  const BASE_INTER_GAP = 9;
+  const BASE_MATCH_W = 9;
+  const BASE_INTRA_GAP = 2;
+  const BASE_INTER_GAP = 19;
+  const HEIGHT_RATIO = 17;
 
   const stage = document.getElementById("stage");
   const resetRing = document.getElementById("resetRing");
@@ -317,8 +318,8 @@
     const scale = Math.min(1, target / baseTotalTop);
 
     matchW = BASE_MATCH_W * scale;
-    matchH = matchW * 14;
-    visible = matchH * 0.47;
+    matchH = matchW * HEIGHT_RATIO;
+    visible = matchH * 0.45;
     intraGap = BASE_INTRA_GAP * scale;
     interGap = BASE_INTER_GAP * scale;
 
