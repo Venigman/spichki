@@ -255,9 +255,9 @@
   const RESET_HOLD_MS = 1000;
 
   // base geometry — scales down on narrow viewports
-  const BASE_MATCH_W = 11;
+  const BASE_MATCH_W = 12;
   const BASE_INTRA_GAP = 4;
-  const BASE_INTER_GAP = 12;
+  const BASE_INTER_GAP = 9;
 
   const stage = document.getElementById("stage");
   const resetRing = document.getElementById("resetRing");
@@ -270,6 +270,8 @@
   let visible = matchH * 0.47;
   let intraGap = BASE_INTRA_GAP;
   let interGap = BASE_INTER_GAP;
+  let safeTop = 0;
+  let safeBottom = 0;
 
   let thrownUp = [];           // match IDs in throw order
   const matches = [];          // [{ id, el }]
@@ -296,7 +298,19 @@
   }
 
   // ---------- geometry ----------
+  function measureSafeAreas() {
+    const probe = document.createElement("div");
+    probe.style.cssText =
+      "position:fixed;left:0;right:0;top:env(safe-area-inset-top);bottom:env(safe-area-inset-bottom);visibility:hidden;pointer-events:none;";
+    document.body.appendChild(probe);
+    const r = probe.getBoundingClientRect();
+    safeTop = Math.max(0, r.top);
+    safeBottom = Math.max(0, window.innerHeight - r.bottom);
+    document.body.removeChild(probe);
+  }
+
   function recomputeGeom() {
+    measureSafeAreas();
     // Scale so the (wider) top piles row fits with comfortable margins.
     const baseTotalTop = 25 * BASE_MATCH_W + 20 * BASE_INTRA_GAP + (PILES - 1) * BASE_INTER_GAP;
     const target = viewW * 0.92;
@@ -316,8 +330,7 @@
     const startX = (viewW - totalW) / 2;
     return {
       x: startX + id * matchW,
-      y: viewH - visible,
-      rotate: false
+      y: viewH - visible - safeBottom
     };
   }
 
@@ -327,10 +340,10 @@
     const pileW = PILE_SIZE * matchW + (PILE_SIZE - 1) * intraGap;
     const totalW = PILES * pileW + (PILES - 1) * interGap;
     const startX = (viewW - totalW) / 2;
+    const topMargin = Math.max(safeTop + 14, 28);
     return {
       x: startX + pile * (pileW + interGap) + inPile * (matchW + intraGap),
-      y: -(matchH - visible),
-      rotate: true
+      y: topMargin
     };
   }
 
@@ -339,8 +352,8 @@
     return idx >= 0 ? topPos(idx) : bottomPos(id);
   }
 
-  function applyTransform(el, x, y, rotate) {
-    el.style.transform = `translate3d(${x}px, ${y}px, 0)${rotate ? " rotate(180deg)" : ""}`;
+  function applyTransform(el, x, y) {
+    el.style.transform = `translate3d(${x}px, ${y}px, 0)`;
   }
 
   // ---------- rendering ----------
@@ -361,7 +374,7 @@
     for (const m of matches) {
       if (!animate) m.el.style.transition = "none";
       const p = posFor(m.id);
-      applyTransform(m.el, p.x, p.y, p.rotate);
+      applyTransform(m.el, p.x, p.y);
     }
     if (!animate) {
       void stage.offsetHeight;
@@ -437,7 +450,7 @@
       const el = matches[swipe.target].el;
       const base = posFor(swipe.target);
       const allowed = swipe.mode === "up" ? Math.min(0, swipe.dy) : Math.max(0, swipe.dy);
-      applyTransform(el, base.x, base.y + allowed, base.rotate);
+      applyTransform(el, base.x, base.y + allowed);
     }
   }
 
@@ -454,7 +467,7 @@
         throwDown(swipe.target);
       } else {
         const base = posFor(swipe.target);
-        applyTransform(el, base.x, base.y, base.rotate);
+        applyTransform(el, base.x, base.y);
       }
     }
     swipe = null;
@@ -466,7 +479,7 @@
       const el = matches[swipe.target].el;
       el.classList.remove("dragging");
       const base = posFor(swipe.target);
-      applyTransform(el, base.x, base.y, base.rotate);
+      applyTransform(el, base.x, base.y);
     }
     swipe = null;
   }
