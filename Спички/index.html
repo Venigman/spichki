@@ -34,7 +34,10 @@
     inset: 0;
   }
 
-  /* Marble background — layered SVG */
+  :root {
+    --match-w: 10px;
+  }
+
   .marble {
     position: fixed;
     inset: 0;
@@ -49,7 +52,6 @@
     inset: 0;
     z-index: 1;
     overflow: hidden;
-    /* respect safe areas */
     padding-top: env(safe-area-inset-top);
     padding-bottom: env(safe-area-inset-bottom);
   }
@@ -58,17 +60,15 @@
     position: absolute;
     top: 0;
     left: 0;
-    width: 7px;
-    height: 96px;
+    width: var(--match-w);
+    height: calc(var(--match-w) * 14);
     transform: translate3d(0, 0, 0);
-    transition: transform 520ms cubic-bezier(0.22, 1, 0.36, 1);
+    transition: transform 540ms cubic-bezier(0.22, 1, 0.36, 1);
     will-change: transform;
-    touch-action: none;
-    cursor: grab;
+    pointer-events: none;
   }
   .match.dragging {
     transition: none;
-    cursor: grabbing;
     z-index: 50;
   }
 
@@ -76,14 +76,14 @@
     position: absolute;
     left: 0;
     right: 0;
-    top: 9px;
+    top: calc(var(--match-w) * 1.05);
     bottom: 0;
     background:
       linear-gradient(180deg,
         rgba(255,255,255,0.18) 0%,
         rgba(255,255,255,0) 6%,
         rgba(0,0,0,0) 80%,
-        rgba(0,0,0,0.12) 100%),
+        rgba(0,0,0,0.14) 100%),
       linear-gradient(90deg,
         #b89360 0%,
         #d6b685 22%,
@@ -95,7 +95,6 @@
       0 1px 1.5px rgba(40, 25, 10, 0.28),
       inset 0 0 0 0.5px rgba(80, 50, 20, 0.25);
   }
-  /* faint wood grain */
   .match-body::after {
     content: "";
     position: absolute;
@@ -104,18 +103,18 @@
     background:
       repeating-linear-gradient(180deg,
         rgba(80, 50, 20, 0) 0px,
-        rgba(80, 50, 20, 0) 8px,
-        rgba(80, 50, 20, 0.06) 9px,
-        rgba(80, 50, 20, 0) 11px);
+        rgba(80, 50, 20, 0) 10px,
+        rgba(80, 50, 20, 0.06) 11px,
+        rgba(80, 50, 20, 0) 13px);
     pointer-events: none;
   }
 
   .match-head {
     position: absolute;
     top: 0;
-    left: -3px;
-    right: -3px;
-    height: 16px;
+    left: calc(var(--match-w) * -0.32);
+    right: calc(var(--match-w) * -0.32);
+    height: calc(var(--match-w) * 2.2);
     background:
       radial-gradient(ellipse at 30% 28%,
         #a3c269 0%,
@@ -127,7 +126,6 @@
       0 1px 2px rgba(20, 30, 5, 0.4),
       inset 0 1px 0 rgba(255, 255, 255, 0.18);
   }
-  /* speckle on the head */
   .match-head::after {
     content: "";
     position: absolute;
@@ -141,23 +139,40 @@
     pointer-events: none;
   }
 
-  /* Discreet reset dot — top-left corner */
-  .reset {
+  /* Reset progress ring (3-finger hold) */
+  .reset-ring {
     position: fixed;
-    top: calc(env(safe-area-inset-top) + 10px);
-    left: 12px;
-    width: 12px;
-    height: 12px;
-    border-radius: 50%;
-    background: rgba(70, 55, 35, 0.16);
-    z-index: 100;
-    transition: background 220ms ease, transform 220ms ease;
-    cursor: pointer;
+    top: 50%;
+    left: 50%;
+    width: 84px;
+    height: 84px;
+    margin: -42px 0 0 -42px;
+    opacity: 0;
+    pointer-events: none;
+    z-index: 200;
+    transition: opacity 180ms ease;
   }
-  .reset.armed {
-    background: radial-gradient(circle, #8c2a22 0%, #5a1810 100%);
-    transform: scale(1.6);
-    transition: background 1.2s linear, transform 1.2s ease-out;
+  .reset-ring.active { opacity: 1; }
+  .reset-ring circle {
+    fill: none;
+    stroke: rgba(160, 55, 30, 0.85);
+    stroke-width: 3.5;
+    stroke-linecap: round;
+    transform: rotate(-90deg);
+    transform-origin: 50% 50%;
+    stroke-dasharray: 245;
+    stroke-dashoffset: 245;
+  }
+  .reset-ring.active circle {
+    animation: ring-fill 1000ms linear forwards;
+  }
+  .reset-ring .ring-bg {
+    stroke: rgba(70, 55, 35, 0.18);
+    stroke-dasharray: none;
+    stroke-dashoffset: 0;
+  }
+  @keyframes ring-fill {
+    to { stroke-dashoffset: 0; }
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -203,30 +218,27 @@
   <rect width="400" height="800" fill="url(#cool)"/>
 
   <g filter="url(#veinWarp)" opacity="0.35">
-    <path d="M -20 120 C 80 100, 180 220, 280 180 S 460 260, 520 200"
-          stroke="#7a6e58" stroke-width="0.8" fill="none"/>
-    <path d="M -20 380 C 100 360, 220 440, 320 410 S 480 470, 540 430"
-          stroke="#6e6452" stroke-width="0.6" fill="none"/>
-    <path d="M -20 600 C 90 580, 170 660, 290 640 S 460 700, 540 670"
-          stroke="#86795f" stroke-width="0.7" fill="none"/>
-    <path d="M -20 240 C 110 280, 220 250, 320 290 S 480 320, 540 300"
-          stroke="#9a8e74" stroke-width="0.4" fill="none"/>
-    <path d="M -20 500 C 80 520, 200 480, 300 530 S 460 540, 540 510"
-          stroke="#5e553f" stroke-width="0.45" fill="none"/>
+    <path d="M -20 120 C 80 100, 180 220, 280 180 S 460 260, 520 200" stroke="#7a6e58" stroke-width="0.8" fill="none"/>
+    <path d="M -20 380 C 100 360, 220 440, 320 410 S 480 470, 540 430" stroke="#6e6452" stroke-width="0.6" fill="none"/>
+    <path d="M -20 600 C 90 580, 170 660, 290 640 S 460 700, 540 670" stroke="#86795f" stroke-width="0.7" fill="none"/>
+    <path d="M -20 240 C 110 280, 220 250, 320 290 S 480 320, 540 300" stroke="#9a8e74" stroke-width="0.4" fill="none"/>
+    <path d="M -20 500 C 80 520, 200 480, 300 530 S 460 540, 540 510" stroke="#5e553f" stroke-width="0.45" fill="none"/>
   </g>
 
   <g filter="url(#veinSoft)" opacity="0.18">
-    <path d="M 60 0 C 80 200, 40 400, 90 600 S 60 800, 80 800"
-          stroke="#fff8e8" stroke-width="1.2" fill="none"/>
-    <path d="M 320 0 C 300 180, 360 380, 310 580 S 340 800, 320 800"
-          stroke="#fff8e8" stroke-width="0.9" fill="none"/>
+    <path d="M 60 0 C 80 200, 40 400, 90 600 S 60 800, 80 800" stroke="#fff8e8" stroke-width="1.2" fill="none"/>
+    <path d="M 320 0 C 300 180, 360 380, 310 580 S 340 800, 320 800" stroke="#fff8e8" stroke-width="0.9" fill="none"/>
   </g>
 
   <rect width="400" height="800" filter="url(#grain)" opacity="0.55"/>
 </svg>
 
 <div class="stage" id="stage"></div>
-<div class="reset" id="reset" aria-label="Сброс (удерживай)"></div>
+
+<svg class="reset-ring" id="resetRing" viewBox="0 0 84 84" aria-hidden="true">
+  <circle class="ring-bg" cx="42" cy="42" r="39"/>
+  <circle class="ring-fg" cx="42" cy="42" r="39"/>
+</svg>
 
 <script>
 (() => {
@@ -235,20 +247,31 @@
   const TOTAL = 25;
   const PILE_SIZE = 5;
   const PILES = 5;
-  const MATCH_W = 7;
-  const MATCH_H = 96;
-  const VISIBLE = 46;       // visible portion at edges
-  const PILE_GAP = 24;      // gap between piles
   const SWIPE_THRESHOLD = 36;
+  const SWIPE_COMMIT = 8;            // dy at which we commit to a swipe direction
   const STORAGE_KEY = "spichki_v1";
   const TTL_MS = 24 * 60 * 60 * 1000;
+  const RESET_FINGERS = 3;
+  const RESET_HOLD_MS = 1000;
+
+  // base geometry — scales down on narrow viewports
+  const BASE_MATCH_W = 11;
+  const BASE_INTRA_GAP = 4;
+  const BASE_INTER_GAP = 12;
 
   const stage = document.getElementById("stage");
-  const resetBtn = document.getElementById("reset");
+  const resetRing = document.getElementById("resetRing");
 
   let viewW = window.innerWidth;
   let viewH = window.innerHeight;
-  let thrownUp = [];           // array of match IDs in throw order
+
+  let matchW = BASE_MATCH_W;
+  let matchH = matchW * 14;
+  let visible = matchH * 0.47;
+  let intraGap = BASE_INTRA_GAP;
+  let interGap = BASE_INTER_GAP;
+
+  let thrownUp = [];           // match IDs in throw order
   const matches = [];          // [{ id, el }]
 
   // ---------- persistence ----------
@@ -264,39 +287,50 @@
       }
       if (!Array.isArray(data.up)) return [];
       return data.up.filter(n => Number.isInteger(n) && n >= 0 && n < TOTAL);
-    } catch (e) {
-      return [];
-    }
+    } catch (e) { return []; }
   }
-
   function saveState() {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({
-        up: thrownUp,
-        t: Date.now()
-      }));
-    } catch (e) { /* quota / private mode — ignore */ }
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ up: thrownUp, t: Date.now() }));
+    } catch (e) {}
   }
 
   // ---------- geometry ----------
+  function recomputeGeom() {
+    // Scale so the (wider) top piles row fits with comfortable margins.
+    const baseTotalTop = 25 * BASE_MATCH_W + 20 * BASE_INTRA_GAP + (PILES - 1) * BASE_INTER_GAP;
+    const target = viewW * 0.92;
+    const scale = Math.min(1, target / baseTotalTop);
+
+    matchW = BASE_MATCH_W * scale;
+    matchH = matchW * 14;
+    visible = matchH * 0.47;
+    intraGap = BASE_INTRA_GAP * scale;
+    interGap = BASE_INTER_GAP * scale;
+
+    document.documentElement.style.setProperty("--match-w", matchW + "px");
+  }
+
   function bottomPos(id) {
-    const totalW = TOTAL * MATCH_W;
+    const totalW = TOTAL * matchW;
     const startX = (viewW - totalW) / 2;
     return {
-      x: startX + id * MATCH_W,
-      y: viewH - VISIBLE
+      x: startX + id * matchW,
+      y: viewH - visible,
+      rotate: false
     };
   }
 
   function topPos(orderIdx) {
     const pile = Math.floor(orderIdx / PILE_SIZE);
     const inPile = orderIdx % PILE_SIZE;
-    const pileW = PILE_SIZE * MATCH_W;
-    const totalW = PILES * pileW + (PILES - 1) * PILE_GAP;
+    const pileW = PILE_SIZE * matchW + (PILE_SIZE - 1) * intraGap;
+    const totalW = PILES * pileW + (PILES - 1) * interGap;
     const startX = (viewW - totalW) / 2;
     return {
-      x: startX + pile * (pileW + PILE_GAP) + inPile * MATCH_W,
-      y: -MATCH_H + VISIBLE
+      x: startX + pile * (pileW + interGap) + inPile * (matchW + intraGap),
+      y: -(matchH - visible),
+      rotate: true
     };
   }
 
@@ -305,8 +339,8 @@
     return idx >= 0 ? topPos(idx) : bottomPos(id);
   }
 
-  function applyTransform(el, x, y) {
-    el.style.transform = `translate3d(${x}px, ${y}px, 0)`;
+  function applyTransform(el, x, y, rotate) {
+    el.style.transform = `translate3d(${x}px, ${y}px, 0)${rotate ? " rotate(180deg)" : ""}`;
   }
 
   // ---------- rendering ----------
@@ -317,7 +351,6 @@
       el.className = "match";
       el.dataset.id = String(i);
       el.innerHTML = '<div class="match-body"></div><div class="match-head"></div>';
-      attachSwipe(el, i);
       matches.push({ id: i, el });
       frag.appendChild(el);
     }
@@ -328,24 +361,33 @@
     for (const m of matches) {
       if (!animate) m.el.style.transition = "none";
       const p = posFor(m.id);
-      applyTransform(m.el, p.x, p.y);
+      applyTransform(m.el, p.x, p.y, p.rotate);
     }
     if (!animate) {
-      // force reflow, then restore transitions
       void stage.offsetHeight;
       for (const m of matches) m.el.style.transition = "";
     }
   }
 
-  // ---------- interaction ----------
+  // ---------- actions ----------
+  function nextDownToThrow() {
+    // rightmost still-down match — bottom row visually shrinks from the right
+    for (let i = TOTAL - 1; i >= 0; i--) {
+      if (!thrownUp.includes(i)) return i;
+    }
+    return -1;
+  }
+  function lastThrown() {
+    return thrownUp.length ? thrownUp[thrownUp.length - 1] : -1;
+  }
+
   function throwUp(id) {
-    if (thrownUp.includes(id)) return;
+    if (id < 0 || thrownUp.includes(id)) return;
     thrownUp.push(id);
     saveState();
     layoutAll(true);
     haptic(8);
   }
-
   function throwDown(id) {
     const idx = thrownUp.indexOf(id);
     if (idx < 0) return;
@@ -355,140 +397,158 @@
     haptic(8);
   }
 
-  function attachSwipe(el, id) {
-    let startX = 0, startY = 0, dy = 0, dx = 0, active = false, pid = null;
+  // ---------- global swipe (anywhere on screen) ----------
+  const activePointers = new Set();
+  let swipe = null;             // { startX, startY, dy, dx, pid, target, mode }
 
-    function onDown(e) {
-      if (e.cancelable) e.preventDefault();
-      const t = e.touches ? e.touches[0] : e;
-      pid = e.pointerId != null ? e.pointerId : null;
-      startX = t.clientX;
-      startY = t.clientY;
-      dy = 0; dx = 0;
-      active = true;
-      el.classList.add("dragging");
-      if (el.setPointerCapture && pid != null) {
-        try { el.setPointerCapture(pid); } catch (_) {}
-      }
-    }
+  function startSwipe(e) {
+    swipe = {
+      startX: e.clientX,
+      startY: e.clientY,
+      dx: 0, dy: 0,
+      pid: e.pointerId,
+      target: -1,
+      mode: null
+    };
+  }
 
-    function onMove(e) {
-      if (!active) return;
-      const t = e.touches ? e.touches[0] : e;
-      dx = t.clientX - startX;
-      dy = t.clientY - startY;
+  function moveSwipe(e) {
+    if (!swipe || e.pointerId !== swipe.pid) return;
+    if (activePointers.size > 1) { cancelSwipe(); return; }
 
-      const isUp = thrownUp.includes(id);
-      let allowedDy = dy;
-      // matches at bottom can only be dragged upward
-      if (!isUp) allowedDy = Math.min(0, dy);
-      // matches in piles can only be dragged downward
-      else allowedDy = Math.max(0, dy);
+    swipe.dx = e.clientX - swipe.startX;
+    swipe.dy = e.clientY - swipe.startY;
 
-      const base = posFor(id);
-      // small horizontal follow for tactile feel, but capped
-      const followX = Math.max(-6, Math.min(6, dx * 0.15));
-      applyTransform(el, base.x + followX, base.y + allowedDy);
-    }
-
-    function onUp(e) {
-      if (!active) return;
-      active = false;
-      el.classList.remove("dragging");
-      if (el.releasePointerCapture && pid != null) {
-        try { el.releasePointerCapture(pid); } catch (_) {}
-      }
-
-      const isUp = thrownUp.includes(id);
-      const verticalIntent = Math.abs(dy) > Math.abs(dx) * 0.8;
-
-      if (!isUp && verticalIntent && dy < -SWIPE_THRESHOLD) {
-        throwUp(id);
-      } else if (isUp && verticalIntent && dy > SWIPE_THRESHOLD) {
-        throwDown(id);
+    if (swipe.target < 0 && Math.abs(swipe.dy) > SWIPE_COMMIT && Math.abs(swipe.dy) > Math.abs(swipe.dx)) {
+      if (swipe.dy < 0) {
+        const id = nextDownToThrow();
+        if (id >= 0) { swipe.target = id; swipe.mode = "up"; }
       } else {
-        // snap back
-        const base = posFor(id);
-        applyTransform(el, base.x, base.y);
+        const id = lastThrown();
+        if (id >= 0) { swipe.target = id; swipe.mode = "down"; }
       }
-      pid = null;
+      if (swipe.target >= 0) {
+        const el = matches[swipe.target].el;
+        el.classList.add("dragging");
+      }
     }
 
-    if (window.PointerEvent) {
-      el.addEventListener("pointerdown", onDown);
-      el.addEventListener("pointermove", onMove);
-      el.addEventListener("pointerup", onUp);
-      el.addEventListener("pointercancel", onUp);
-    } else {
-      el.addEventListener("touchstart", onDown, { passive: false });
-      el.addEventListener("touchmove", onMove, { passive: false });
-      el.addEventListener("touchend", onUp);
-      el.addEventListener("touchcancel", onUp);
-      el.addEventListener("mousedown", onDown);
-      window.addEventListener("mousemove", onMove);
-      window.addEventListener("mouseup", onUp);
+    if (swipe.target >= 0) {
+      const el = matches[swipe.target].el;
+      const base = posFor(swipe.target);
+      const allowed = swipe.mode === "up" ? Math.min(0, swipe.dy) : Math.max(0, swipe.dy);
+      applyTransform(el, base.x, base.y + allowed, base.rotate);
     }
   }
 
-  // ---------- reset (long press) ----------
+  function endSwipe(e) {
+    if (!swipe || (e && e.pointerId !== swipe.pid)) return;
+
+    if (swipe.target >= 0) {
+      const el = matches[swipe.target].el;
+      el.classList.remove("dragging");
+
+      if (swipe.mode === "up" && swipe.dy < -SWIPE_THRESHOLD) {
+        throwUp(swipe.target);
+      } else if (swipe.mode === "down" && swipe.dy > SWIPE_THRESHOLD) {
+        throwDown(swipe.target);
+      } else {
+        const base = posFor(swipe.target);
+        applyTransform(el, base.x, base.y, base.rotate);
+      }
+    }
+    swipe = null;
+  }
+
+  function cancelSwipe() {
+    if (!swipe) return;
+    if (swipe.target >= 0) {
+      const el = matches[swipe.target].el;
+      el.classList.remove("dragging");
+      const base = posFor(swipe.target);
+      applyTransform(el, base.x, base.y, base.rotate);
+    }
+    swipe = null;
+  }
+
+  // ---------- 3-finger reset ----------
   let resetTimer = null;
-  function startReset(e) {
-    if (e && e.cancelable) e.preventDefault();
-    resetBtn.classList.add("armed");
+  function armReset() {
+    if (resetTimer) return;
+    resetRing.classList.add("active");
     resetTimer = setTimeout(() => {
       thrownUp = [];
       saveState();
       layoutAll(true);
-      haptic(30);
-      resetBtn.classList.remove("armed");
-    }, 1400);
+      haptic([20, 60, 20]);
+      resetRing.classList.remove("active");
+      resetTimer = null;
+    }, RESET_HOLD_MS);
   }
-  function cancelReset() {
-    clearTimeout(resetTimer);
-    resetTimer = null;
-    resetBtn.classList.remove("armed");
-  }
-  if (window.PointerEvent) {
-    resetBtn.addEventListener("pointerdown", startReset);
-    resetBtn.addEventListener("pointerup", cancelReset);
-    resetBtn.addEventListener("pointerleave", cancelReset);
-    resetBtn.addEventListener("pointercancel", cancelReset);
-  } else {
-    resetBtn.addEventListener("touchstart", startReset, { passive: false });
-    resetBtn.addEventListener("touchend", cancelReset);
-    resetBtn.addEventListener("touchcancel", cancelReset);
-    resetBtn.addEventListener("mousedown", startReset);
-    resetBtn.addEventListener("mouseup", cancelReset);
-    resetBtn.addEventListener("mouseleave", cancelReset);
+  function disarmReset() {
+    if (resetTimer) {
+      clearTimeout(resetTimer);
+      resetTimer = null;
+    }
+    resetRing.classList.remove("active");
   }
 
-  // ---------- haptics ----------
-  function haptic(ms) {
-    if (navigator.vibrate) {
-      try { navigator.vibrate(ms); } catch (_) {}
+  // ---------- pointer dispatch ----------
+  function onPointerDown(e) {
+    activePointers.add(e.pointerId);
+    if (activePointers.size === 1) {
+      startSwipe(e);
+    } else {
+      // any 2nd+ finger cancels swipe
+      cancelSwipe();
+      if (activePointers.size >= RESET_FINGERS) {
+        armReset();
+      }
     }
+  }
+  function onPointerMove(e) {
+    moveSwipe(e);
+  }
+  function onPointerUp(e) {
+    activePointers.delete(e.pointerId);
+    endSwipe(e);
+    if (activePointers.size < RESET_FINGERS) {
+      disarmReset();
+    }
+  }
+
+  document.addEventListener("pointerdown", onPointerDown);
+  document.addEventListener("pointermove", onPointerMove);
+  document.addEventListener("pointerup", onPointerUp);
+  document.addEventListener("pointercancel", onPointerUp);
+
+  // ---------- haptics ----------
+  function haptic(p) {
+    if (navigator.vibrate) { try { navigator.vibrate(p); } catch (e) {} }
   }
 
   // ---------- viewport ----------
   function onResize() {
     viewW = window.innerWidth;
     viewH = window.innerHeight;
+    recomputeGeom();
     layoutAll(false);
   }
   window.addEventListener("resize", onResize);
   window.addEventListener("orientationchange", onResize);
 
-  // prevent pull-to-refresh / overscroll
+  // prevent any native scroll / pull-to-refresh
   document.addEventListener("touchmove", (e) => {
     if (e.cancelable) e.preventDefault();
   }, { passive: false });
+  document.addEventListener("gesturestart", (e) => e.preventDefault());
 
   // ---------- boot ----------
   thrownUp = loadState();
+  recomputeGeom();
   buildMatches();
   layoutAll(false);
 
-  // service worker
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", () => {
       navigator.serviceWorker.register("sw.js").catch(() => {});
