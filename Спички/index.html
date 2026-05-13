@@ -164,7 +164,7 @@
     stroke-dashoffset: 245;
   }
   .reset-ring.active circle {
-    animation: ring-fill 1000ms linear forwards;
+    animation: ring-fill 900ms linear forwards;
   }
   .reset-ring .ring-bg {
     stroke: rgba(70, 55, 35, 0.18);
@@ -251,8 +251,9 @@
   const SWIPE_COMMIT = 8;            // dy at which we commit to a swipe direction
   const STORAGE_KEY = "spichki_v1";
   const TTL_MS = 24 * 60 * 60 * 1000;
-  const RESET_FINGERS = 3;
-  const RESET_HOLD_MS = 1000;
+  const HOLD_SHOW_MS = 300;          // delay before reset ring appears
+  const HOLD_RESET_MS = 1200;        // total hold time to trigger reset
+  const HOLD_MOVE_TOLERANCE = 8;     // px of movement that cancels the hold
 
   // base geometry — scales down on narrow viewports
   const BASE_MATCH_W = 9;
@@ -433,6 +434,10 @@
     swipe.dx = e.clientX - swipe.startX;
     swipe.dy = e.clientY - swipe.startY;
 
+    if (Math.abs(swipe.dx) > HOLD_MOVE_TOLERANCE || Math.abs(swipe.dy) > HOLD_MOVE_TOLERANCE) {
+      cancelHold();
+    }
+
     if (swipe.target < 0 && Math.abs(swipe.dy) > SWIPE_COMMIT && Math.abs(swipe.dy) > Math.abs(swipe.dx)) {
       if (swipe.dy < 0) {
         const id = nextDownToThrow();
@@ -485,25 +490,28 @@
     swipe = null;
   }
 
-  // ---------- 3-finger reset ----------
-  let resetTimer = null;
-  function armReset() {
-    if (resetTimer) return;
-    resetRing.classList.add("active");
-    resetTimer = setTimeout(() => {
+  // ---------- long-press reset (1 finger) ----------
+  let holdShowTimer = null;
+  let holdResetTimer = null;
+  function startHold() {
+    cancelHold();
+    holdShowTimer = setTimeout(() => {
+      resetRing.classList.add("active");
+      holdShowTimer = null;
+    }, HOLD_SHOW_MS);
+    holdResetTimer = setTimeout(() => {
+      cancelSwipe();
       thrownUp = [];
       saveState();
       layoutAll(true);
       haptic([20, 60, 20]);
       resetRing.classList.remove("active");
-      resetTimer = null;
-    }, RESET_HOLD_MS);
+      holdResetTimer = null;
+    }, HOLD_RESET_MS);
   }
-  function disarmReset() {
-    if (resetTimer) {
-      clearTimeout(resetTimer);
-      resetTimer = null;
-    }
+  function cancelHold() {
+    if (holdShowTimer) { clearTimeout(holdShowTimer); holdShowTimer = null; }
+    if (holdResetTimer) { clearTimeout(holdResetTimer); holdResetTimer = null; }
     resetRing.classList.remove("active");
   }
 
@@ -512,12 +520,11 @@
     activePointers.add(e.pointerId);
     if (activePointers.size === 1) {
       startSwipe(e);
+      startHold();
     } else {
-      // any 2nd+ finger cancels swipe
+      // any 2nd+ finger cancels both swipe and hold
       cancelSwipe();
-      if (activePointers.size >= RESET_FINGERS) {
-        armReset();
-      }
+      cancelHold();
     }
   }
   function onPointerMove(e) {
@@ -526,9 +533,7 @@
   function onPointerUp(e) {
     activePointers.delete(e.pointerId);
     endSwipe(e);
-    if (activePointers.size < RESET_FINGERS) {
-      disarmReset();
-    }
+    cancelHold();
   }
 
   document.addEventListener("pointerdown", onPointerDown);

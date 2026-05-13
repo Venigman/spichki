@@ -1,4 +1,4 @@
-const CACHE = "spichki-v6";
+const CACHE = "spichki-v7";
 const ASSETS = [
   "./",
   "./index.html",
