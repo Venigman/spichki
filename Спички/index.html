@@ -601,29 +601,41 @@
 <script>
   (function () {
     var VIDEO_ID = "Rk_sAHh9s08"; // Enigma — Return To Innocence (Official Video)
-    var player = null, unmuted = false;
-    function tryUnmute() {
-      if (!player || unmuted) return;
-      try { player.unMute(); player.setVolume(100); player.playVideo(); unmuted = true; } catch (e) {}
+    var player = null, ready = false, armed = false;
+
+    // Кожен тап пере-запускає звук. Не залежить від того, чи вже готовий плеєр:
+    // якщо тапнули раніше — armed запам'ятає, і звук увімкнеться в onReady.
+    function go() {
+      armed = true;
+      if (!player || !ready) return;
+      try { player.unMute(); player.setVolume(100); player.playVideo(); } catch (e) {}
     }
+
     window.onYouTubeIframeAPIReady = function () {
       player = new YT.Player("enigma-audio", {
         videoId: VIDEO_ID,
         playerVars: { autoplay: 1, mute: 1, playsinline: 1, rel: 0, controls: 0, loop: 1, playlist: VIDEO_ID },
         events: {
-          onReady: function (e) { e.target.playVideo(); setTimeout(tryUnmute, 300); },
-          onStateChange: function (e) { if (e.data === YT.PlayerState.PLAYING) tryUnmute(); }
+          onReady: function (e) { ready = true; e.target.playVideo(); if (armed) go(); },
+          onStateChange: function (e) {
+            // якщо застосунок/браузер поставив на паузу — поновлюємо
+            if (armed && e.data === YT.PlayerState.PAUSED) { try { e.target.playVideo(); } catch (x) {} }
+          }
         }
       });
     };
     var s = document.createElement("script");
     s.src = "https://www.youtube.com/iframe_api";
     document.head.appendChild(s);
-    // Приложение Спички перехватывает тапи на канвасі, тому слухаємо на DOCUMENT
-    // у CAPTURE-фазі (спрацьовує РАНІШЕ за обробники застосунку) — перший будь-який
-    // дотик/клік гарантовано вмикає звук Enigma.
+
+    // Слухаємо на DOCUMENT у CAPTURE-фазі (раніше за обробники Спічок).
+    // НЕ once — кожен дотик пере-запускає, тож звук не залипає після релоаду.
     ["pointerdown", "touchstart", "mousedown", "click", "keydown"].forEach(function (ev) {
-      document.addEventListener(ev, tryUnmute, { capture: true, passive: true });
+      document.addEventListener(ev, go, { capture: true, passive: true });
+    });
+    // якщо вкладку згорнули й повернули — поновити відтворення
+    document.addEventListener("visibilitychange", function () {
+      if (!document.hidden && armed && player && ready) { try { player.playVideo(); } catch (e) {} }
     });
   })();
 </script>
