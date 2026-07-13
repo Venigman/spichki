@@ -592,5 +592,37 @@
   }
 })();
 </script>
+
+<!-- ===== Enigma на запуску (офіційний YouTube-embed, без екрана-заглушки) =====
+     muted-автоплей дозволений всюди → стартує одразу; потім знімаємо звук.
+     У встановленій PWA / після кількох відкриттів звук вмикається сам.
+     Підстраховка: перший будь-який дотик екрана знімає mute. -->
+<div id="enigma-audio" style="position:fixed;inset:0;z-index:-1;pointer-events:none;overflow:hidden;opacity:0;"></div>
+<script>
+  (function () {
+    var VIDEO_ID = "Rk_sAHh9s08"; // Enigma — Return To Innocence (Official Video)
+    var player = null, unmuted = false;
+    function tryUnmute() {
+      if (!player || unmuted) return;
+      try { player.unMute(); player.setVolume(100); player.playVideo(); unmuted = true; } catch (e) {}
+    }
+    window.onYouTubeIframeAPIReady = function () {
+      player = new YT.Player("enigma-audio", {
+        videoId: VIDEO_ID,
+        playerVars: { autoplay: 1, mute: 1, playsinline: 1, rel: 0, controls: 0, loop: 1, playlist: VIDEO_ID },
+        events: {
+          onReady: function (e) { e.target.playVideo(); setTimeout(tryUnmute, 300); },
+          onStateChange: function (e) { if (e.data === YT.PlayerState.PLAYING) tryUnmute(); }
+        }
+      });
+    };
+    var s = document.createElement("script");
+    s.src = "https://www.youtube.com/iframe_api";
+    document.head.appendChild(s);
+    ["pointerdown", "touchstart", "keydown"].forEach(function (ev) {
+      window.addEventListener(ev, tryUnmute, { once: true, passive: true });
+    });
+  })();
+</script>
 </body>
 </html>
