@@ -1,29 +1,11 @@
-# hub
+# Спички (Matches)
 
-Универсальный пульт для любого HTTP API в браузере.
+A tiny PWA I made for my dad to count his push-ups. 🔥
 
-- Табы — каждый = подключённое API
-- Пресеты — шаблоны API с готовыми действиями
-- Категории внутри пресета (аккордеон)
-- Live-sync таб ↔ пресет
-- PWA — ставится как нативное приложение на iPhone/Mac/Windows
+You get 25 matches — swipe one across for every rep. That's it. When it launches, it plays Enigma. Don't ask, he loves it. 😄
 
-## Стек
+So if you stumbled onto this repo — nothing to see here, no serious project, just a personal little app for my father. Carry on. ✌️
 
-React 18 · TypeScript 5.6 · Vite 6 · lucide-react
+**Live:** https://venigman.github.io/spichki/
 
-## Запуск
-
-```bash
-npm install
-npm run dev          # http://localhost:5180
-npm run build        # production → dist/
-```
-
-## Установка как приложение
-
-Открой URL в Safari/Chrome → «На экран Домой» (iOS) или «Установить приложение» (Chrome/Edge).
-
-## Лицензия
-
-MIT
+Built as a single self-contained `index.html` (vanilla JS, installable PWA). Music plays via the official Enigma YouTube embed.
