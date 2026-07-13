@@ -619,8 +619,11 @@
     var s = document.createElement("script");
     s.src = "https://www.youtube.com/iframe_api";
     document.head.appendChild(s);
-    ["pointerdown", "touchstart", "keydown"].forEach(function (ev) {
-      window.addEventListener(ev, tryUnmute, { once: true, passive: true });
+    // Приложение Спички перехватывает тапи на канвасі, тому слухаємо на DOCUMENT
+    // у CAPTURE-фазі (спрацьовує РАНІШЕ за обробники застосунку) — перший будь-який
+    // дотик/клік гарантовано вмикає звук Enigma.
+    ["pointerdown", "touchstart", "mousedown", "click", "keydown"].forEach(function (ev) {
+      document.addEventListener(ev, tryUnmute, { capture: true, passive: true });
     });
   })();
 </script>
