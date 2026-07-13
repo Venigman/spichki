@@ -1,39 +1,596 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="ru">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content" />
-    <meta name="theme-color" content="#0d1117" />
-    <meta name="description" content="hub — универсальный пульт для любого HTTP API: пресеты, категории, действия в одно касание." />
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+<meta name="theme-color" content="#cdc6b6">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Спички">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon.svg">
+<title>Спички</title>
+<style>
+  *, *::before, *::after {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  html, body {
+    height: 100%;
+    width: 100%;
+    overflow: hidden;
+    overscroll-behavior: none;
+    touch-action: none;
+    background: #cdc6b6;
+  }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    position: fixed;
+    inset: 0;
+  }
 
-    <!-- PWA -->
-    <link rel="manifest" href="./manifest.webmanifest" />
+  :root {
+    --match-w: 10px;
+  }
 
-    <!-- Browser-favicon — light версия (белый фон, чёрная V) — ярко в табе -->
-    <link rel="icon" type="image/png" sizes="16x16"   href="./favicon-16.png" />
-    <link rel="icon" type="image/png" sizes="32x32"   href="./favicon-32.png" />
-    <link rel="icon" type="image/png" sizes="192x192" href="./favicon-192.png" />
+  .marble {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 0;
+    pointer-events: none;
+  }
 
-    <!-- iOS standalone (как нативное приложение из Safari → На экран Домой):
-         dark-вариант, белая V на чёрном — выглядит нативно -->
-    <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="apple-mobile-web-app-title" content="hub" />
-    <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
+  .stage {
+    position: fixed;
+    inset: 0;
+    z-index: 1;
+    overflow: hidden;
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
 
-    <title>hub — Universal API Hub</title>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-    <script>
-      // Регистрируем service worker только в production-сборке.
-      // Используем относительный путь — scope привяжется к директории где лежит sw.js.
-      if ("serviceWorker" in navigator && location.hostname !== "localhost" && location.hostname !== "127.0.0.1") {
-        window.addEventListener("load", () => {
-          navigator.serviceWorker.register("./sw.js").catch(() => {});
-        });
+  .match {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: var(--match-w);
+    height: calc(var(--match-w) * 17);
+    transform: translate3d(0, 0, 0);
+    transition: transform 540ms cubic-bezier(0.22, 1, 0.36, 1);
+    will-change: transform;
+    pointer-events: none;
+  }
+  .match.dragging {
+    transition: none;
+    z-index: 50;
+  }
+
+  .match-body {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: calc(var(--match-w) * 1.05);
+    bottom: 0;
+    background:
+      linear-gradient(180deg,
+        rgba(255,255,255,0.18) 0%,
+        rgba(255,255,255,0) 6%,
+        rgba(0,0,0,0) 80%,
+        rgba(0,0,0,0.14) 100%),
+      linear-gradient(90deg,
+        #b89360 0%,
+        #d6b685 22%,
+        #e6cba0 50%,
+        #c79f6c 78%,
+        #8e6c40 100%);
+    border-radius: 1.5px;
+    box-shadow:
+      0 1px 1.5px rgba(40, 25, 10, 0.28),
+      inset 0 0 0 0.5px rgba(80, 50, 20, 0.25);
+  }
+  .match-body::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background:
+      repeating-linear-gradient(180deg,
+        rgba(80, 50, 20, 0) 0px,
+        rgba(80, 50, 20, 0) 10px,
+        rgba(80, 50, 20, 0.06) 11px,
+        rgba(80, 50, 20, 0) 13px);
+    pointer-events: none;
+  }
+
+  .match-head {
+    position: absolute;
+    top: 0;
+    left: calc(var(--match-w) * -0.32);
+    right: calc(var(--match-w) * -0.32);
+    height: calc(var(--match-w) * 2.2);
+    background:
+      radial-gradient(ellipse at 30% 28%,
+        #a3c269 0%,
+        #6a9038 28%,
+        #3e6322 65%,
+        #213d11 100%);
+    border-radius: 50% 50% 38% 38% / 62% 62% 38% 38%;
+    box-shadow:
+      0 1px 2px rgba(20, 30, 5, 0.4),
+      inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  }
+  .match-head::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background-image:
+      radial-gradient(circle at 60% 70%, rgba(0,0,0,0.18) 0.5px, transparent 1.2px),
+      radial-gradient(circle at 25% 60%, rgba(255,255,255,0.15) 0.4px, transparent 1px),
+      radial-gradient(circle at 70% 30%, rgba(0,0,0,0.12) 0.4px, transparent 1px);
+    background-size: 6px 6px, 5px 5px, 7px 7px;
+    pointer-events: none;
+  }
+
+  /* Reset progress ring (3-finger hold) */
+  .reset-ring {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    width: 84px;
+    height: 84px;
+    margin: -42px 0 0 -42px;
+    opacity: 0;
+    pointer-events: none;
+    z-index: 200;
+    transition: opacity 180ms ease;
+  }
+  .reset-ring.active { opacity: 1; }
+  .reset-ring circle {
+    fill: none;
+    stroke: rgba(160, 55, 30, 0.85);
+    stroke-width: 3.5;
+    stroke-linecap: round;
+    transform: rotate(-90deg);
+    transform-origin: 50% 50%;
+    stroke-dasharray: 245;
+    stroke-dashoffset: 245;
+  }
+  .reset-ring.active circle {
+    animation: ring-fill 900ms linear forwards;
+  }
+  .reset-ring .ring-bg {
+    stroke: rgba(70, 55, 35, 0.18);
+    stroke-dasharray: none;
+    stroke-dashoffset: 0;
+  }
+  @keyframes ring-fill {
+    to { stroke-dashoffset: 0; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .match { transition-duration: 0ms; }
+  }
+</style>
+</head>
+<body>
+
+<svg class="marble" viewBox="0 0 400 800" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+  <defs>
+    <linearGradient id="base" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#dcd5c5"/>
+      <stop offset="0.45" stop-color="#c9c1ac"/>
+      <stop offset="1" stop-color="#bdb39c"/>
+    </linearGradient>
+    <radialGradient id="warm" cx="0.7" cy="0.2" r="0.9">
+      <stop offset="0" stop-color="#e8dcc2" stop-opacity="0.45"/>
+      <stop offset="1" stop-color="#e8dcc2" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="cool" cx="0.15" cy="0.85" r="0.85">
+      <stop offset="0" stop-color="#9b9484" stop-opacity="0.3"/>
+      <stop offset="1" stop-color="#9b9484" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="grain">
+      <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" stitchTiles="stitch"/>
+      <feColorMatrix values="0 0 0 0 0.4
+                              0 0 0 0 0.36
+                              0 0 0 0 0.28
+                              0 0 0 0.06 0"/>
+    </filter>
+    <filter id="veinWarp">
+      <feTurbulence type="fractalNoise" baseFrequency="0.014" numOctaves="2" seed="7"/>
+      <feDisplacementMap in="SourceGraphic" scale="42"/>
+    </filter>
+    <filter id="veinSoft">
+      <feGaussianBlur stdDeviation="0.6"/>
+    </filter>
+  </defs>
+
+  <rect width="400" height="800" fill="url(#base)"/>
+  <rect width="400" height="800" fill="url(#warm)"/>
+  <rect width="400" height="800" fill="url(#cool)"/>
+
+  <g filter="url(#veinWarp)" opacity="0.35">
+    <path d="M -20 120 C 80 100, 180 220, 280 180 S 460 260, 520 200" stroke="#7a6e58" stroke-width="0.8" fill="none"/>
+    <path d="M -20 380 C 100 360, 220 440, 320 410 S 480 470, 540 430" stroke="#6e6452" stroke-width="0.6" fill="none"/>
+    <path d="M -20 600 C 90 580, 170 660, 290 640 S 460 700, 540 670" stroke="#86795f" stroke-width="0.7" fill="none"/>
+    <path d="M -20 240 C 110 280, 220 250, 320 290 S 480 320, 540 300" stroke="#9a8e74" stroke-width="0.4" fill="none"/>
+    <path d="M -20 500 C 80 520, 200 480, 300 530 S 460 540, 540 510" stroke="#5e553f" stroke-width="0.45" fill="none"/>
+  </g>
+
+  <g filter="url(#veinSoft)" opacity="0.18">
+    <path d="M 60 0 C 80 200, 40 400, 90 600 S 60 800, 80 800" stroke="#fff8e8" stroke-width="1.2" fill="none"/>
+    <path d="M 320 0 C 300 180, 360 380, 310 580 S 340 800, 320 800" stroke="#fff8e8" stroke-width="0.9" fill="none"/>
+  </g>
+
+  <rect width="400" height="800" filter="url(#grain)" opacity="0.55"/>
+</svg>
+
+<div class="stage" id="stage"></div>
+
+<svg class="reset-ring" id="resetRing" viewBox="0 0 84 84" aria-hidden="true">
+  <circle class="ring-bg" cx="42" cy="42" r="39"/>
+  <circle class="ring-fg" cx="42" cy="42" r="39"/>
+</svg>
+
+<script>
+(() => {
+  "use strict";
+
+  const TOTAL = 25;
+  const PILE_SIZE = 5;
+  const PILES = 5;
+  const SWIPE_THRESHOLD = 36;
+  const SWIPE_COMMIT = 8;            // dy at which we commit to a swipe direction
+  const STORAGE_KEY = "spichki_v1";
+  const TTL_MS = 24 * 60 * 60 * 1000;
+  const HOLD_SHOW_MS = 300;          // delay before reset ring appears
+  const HOLD_RESET_MS = 1200;        // total hold time to trigger reset
+  const HOLD_MOVE_TOLERANCE = 8;     // px of movement that cancels the hold
+
+  // base geometry — scales down on narrow viewports
+  const BASE_MATCH_W = 9;
+  const BASE_INTRA_GAP = 2;
+  const BASE_INTER_GAP = 19;
+  const HEIGHT_RATIO = 17;
+
+  const stage = document.getElementById("stage");
+  const resetRing = document.getElementById("resetRing");
+
+  let viewW = window.innerWidth;
+  let viewH = window.innerHeight;
+
+  let matchW = BASE_MATCH_W;
+  let matchH = matchW * 14;
+  let visible = matchH * 0.47;
+  let intraGap = BASE_INTRA_GAP;
+  let interGap = BASE_INTER_GAP;
+  let safeTop = 0;
+  let safeBottom = 0;
+
+  let thrownUp = [];           // match IDs in throw order
+  const matches = [];          // [{ id, el }]
+
+  // ---------- persistence ----------
+  function loadState() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return [];
+      const data = JSON.parse(raw);
+      if (!data || typeof data.t !== "number") return [];
+      if (Date.now() - data.t > TTL_MS) {
+        localStorage.removeItem(STORAGE_KEY);
+        return [];
       }
-    </script>
-  </body>
+      if (!Array.isArray(data.up)) return [];
+      return data.up.filter(n => Number.isInteger(n) && n >= 0 && n < TOTAL);
+    } catch (e) { return []; }
+  }
+  function saveState() {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ up: thrownUp, t: Date.now() }));
+    } catch (e) {}
+  }
+
+  // ---------- geometry ----------
+  function measureSafeAreas() {
+    const probe = document.createElement("div");
+    probe.style.cssText =
+      "position:fixed;left:0;right:0;top:env(safe-area-inset-top);bottom:env(safe-area-inset-bottom);visibility:hidden;pointer-events:none;";
+    document.body.appendChild(probe);
+    const r = probe.getBoundingClientRect();
+    safeTop = Math.max(0, r.top);
+    safeBottom = Math.max(0, window.innerHeight - r.bottom);
+    document.body.removeChild(probe);
+  }
+
+  function recomputeGeom() {
+    measureSafeAreas();
+    // Scale so the (wider) top piles row fits with comfortable margins.
+    const baseTotalTop = 25 * BASE_MATCH_W + 20 * BASE_INTRA_GAP + (PILES - 1) * BASE_INTER_GAP;
+    const target = viewW * 0.92;
+    const scale = Math.min(1, target / baseTotalTop);
+
+    matchW = BASE_MATCH_W * scale;
+    matchH = matchW * HEIGHT_RATIO;
+    visible = matchH * 0.45;
+    intraGap = BASE_INTRA_GAP * scale;
+    interGap = BASE_INTER_GAP * scale;
+
+    document.documentElement.style.setProperty("--match-w", matchW + "px");
+  }
+
+  function bottomPos(id) {
+    const totalW = TOTAL * matchW + (TOTAL - 1) * intraGap;
+    const startX = (viewW - totalW) / 2;
+    return {
+      x: startX + id * (matchW + intraGap),
+      y: viewH - visible - safeBottom
+    };
+  }
+
+  function topPos(orderIdx) {
+    const pile = Math.floor(orderIdx / PILE_SIZE);
+    const inPile = orderIdx % PILE_SIZE;
+    const pileW = PILE_SIZE * matchW + (PILE_SIZE - 1) * intraGap;
+    const totalW = PILES * pileW + (PILES - 1) * interGap;
+    const startX = (viewW - totalW) / 2;
+    const topMargin = Math.max(safeTop + 14, 28);
+    return {
+      x: startX + pile * (pileW + interGap) + inPile * (matchW + intraGap),
+      y: topMargin
+    };
+  }
+
+  function posFor(id) {
+    const idx = thrownUp.indexOf(id);
+    return idx >= 0 ? topPos(idx) : bottomPos(id);
+  }
+
+  function applyTransform(el, x, y) {
+    el.style.transform = `translate3d(${x}px, ${y}px, 0)`;
+  }
+
+  // ---------- rendering ----------
+  function buildMatches() {
+    const frag = document.createDocumentFragment();
+    for (let i = 0; i < TOTAL; i++) {
+      const el = document.createElement("div");
+      el.className = "match";
+      el.dataset.id = String(i);
+      el.innerHTML = '<div class="match-body"></div><div class="match-head"></div>';
+      matches.push({ id: i, el });
+      frag.appendChild(el);
+    }
+    stage.appendChild(frag);
+  }
+
+  function layoutAll(animate) {
+    for (const m of matches) {
+      if (!animate) m.el.style.transition = "none";
+      const p = posFor(m.id);
+      applyTransform(m.el, p.x, p.y);
+    }
+    if (!animate) {
+      void stage.offsetHeight;
+      for (const m of matches) m.el.style.transition = "";
+    }
+  }
+
+  // ---------- actions ----------
+  function nextDownToThrow() {
+    // rightmost still-down match — bottom row visually shrinks from the right
+    for (let i = TOTAL - 1; i >= 0; i--) {
+      if (!thrownUp.includes(i)) return i;
+    }
+    return -1;
+  }
+  function lastThrown() {
+    return thrownUp.length ? thrownUp[thrownUp.length - 1] : -1;
+  }
+
+  function throwUp(id) {
+    if (id < 0 || thrownUp.includes(id)) return;
+    thrownUp.push(id);
+    saveState();
+    layoutAll(true);
+    haptic(8);
+  }
+  function throwDown(id) {
+    const idx = thrownUp.indexOf(id);
+    if (idx < 0) return;
+    thrownUp.splice(idx, 1);
+    saveState();
+    layoutAll(true);
+    haptic(8);
+  }
+
+  // ---------- global swipe (anywhere on screen) ----------
+  const activePointers = new Set();
+  let swipe = null;             // { startX, startY, dy, dx, pid, target, mode }
+
+  function startSwipe(e) {
+    swipe = {
+      startX: e.clientX,
+      startY: e.clientY,
+      dx: 0, dy: 0,
+      pid: e.pointerId,
+      target: -1,
+      mode: null
+    };
+  }
+
+  function moveSwipe(e) {
+    if (!swipe || e.pointerId !== swipe.pid) return;
+    if (activePointers.size > 1) { cancelSwipe(); return; }
+
+    swipe.dx = e.clientX - swipe.startX;
+    swipe.dy = e.clientY - swipe.startY;
+
+    if (Math.abs(swipe.dx) > HOLD_MOVE_TOLERANCE || Math.abs(swipe.dy) > HOLD_MOVE_TOLERANCE) {
+      cancelHold();
+    }
+
+    if (swipe.target < 0 && Math.abs(swipe.dy) > SWIPE_COMMIT && Math.abs(swipe.dy) > Math.abs(swipe.dx)) {
+      if (swipe.dy < 0) {
+        const id = nextDownToThrow();
+        if (id >= 0) { swipe.target = id; swipe.mode = "up"; }
+      } else {
+        const id = lastThrown();
+        if (id >= 0) { swipe.target = id; swipe.mode = "down"; }
+      }
+      if (swipe.target >= 0) {
+        const el = matches[swipe.target].el;
+        el.classList.add("dragging");
+      }
+    }
+
+    if (swipe.target >= 0) {
+      const el = matches[swipe.target].el;
+      const base = posFor(swipe.target);
+      const allowed = swipe.mode === "up" ? Math.min(0, swipe.dy) : Math.max(0, swipe.dy);
+      applyTransform(el, base.x, base.y + allowed);
+    }
+  }
+
+  function endSwipe(e) {
+    if (!swipe || (e && e.pointerId !== swipe.pid)) return;
+
+    if (swipe.target >= 0) {
+      const el = matches[swipe.target].el;
+      el.classList.remove("dragging");
+
+      if (swipe.mode === "up" && swipe.dy < -SWIPE_THRESHOLD) {
+        throwUp(swipe.target);
+      } else if (swipe.mode === "down" && swipe.dy > SWIPE_THRESHOLD) {
+        throwDown(swipe.target);
+      } else {
+        const base = posFor(swipe.target);
+        applyTransform(el, base.x, base.y);
+      }
+    }
+    swipe = null;
+  }
+
+  function cancelSwipe() {
+    if (!swipe) return;
+    if (swipe.target >= 0) {
+      const el = matches[swipe.target].el;
+      el.classList.remove("dragging");
+      const base = posFor(swipe.target);
+      applyTransform(el, base.x, base.y);
+    }
+    swipe = null;
+  }
+
+  // ---------- long-press reset (1 finger) ----------
+  let holdShowTimer = null;
+  let holdResetTimer = null;
+  function startHold() {
+    cancelHold();
+    holdShowTimer = setTimeout(() => {
+      resetRing.classList.add("active");
+      holdShowTimer = null;
+    }, HOLD_SHOW_MS);
+    holdResetTimer = setTimeout(() => {
+      cancelSwipe();
+      thrownUp = [];
+      saveState();
+      layoutAll(true);
+      haptic([20, 60, 20]);
+      resetRing.classList.remove("active");
+      holdResetTimer = null;
+    }, HOLD_RESET_MS);
+  }
+  function cancelHold() {
+    if (holdShowTimer) { clearTimeout(holdShowTimer); holdShowTimer = null; }
+    if (holdResetTimer) { clearTimeout(holdResetTimer); holdResetTimer = null; }
+    resetRing.classList.remove("active");
+  }
+
+  // ---------- pointer dispatch ----------
+  function onPointerDown(e) {
+    activePointers.add(e.pointerId);
+    if (activePointers.size === 1) {
+      startSwipe(e);
+      startHold();
+    } else {
+      // any 2nd+ finger cancels both swipe and hold
+      cancelSwipe();
+      cancelHold();
+    }
+  }
+  function onPointerMove(e) {
+    moveSwipe(e);
+  }
+  function onPointerUp(e) {
+    activePointers.delete(e.pointerId);
+    endSwipe(e);
+    cancelHold();
+  }
+
+  document.addEventListener("pointerdown", onPointerDown);
+  document.addEventListener("pointermove", onPointerMove);
+  document.addEventListener("pointerup", onPointerUp);
+  document.addEventListener("pointercancel", onPointerUp);
+
+  // ---------- haptics ----------
+  function haptic(p) {
+    if (navigator.vibrate) { try { navigator.vibrate(p); } catch (e) {} }
+  }
+
+  // ---------- viewport ----------
+  function onResize() {
+    viewW = window.innerWidth;
+    viewH = window.innerHeight;
+    recomputeGeom();
+    layoutAll(false);
+  }
+  window.addEventListener("resize", onResize);
+  window.addEventListener("orientationchange", onResize);
+
+  // prevent any native scroll / pull-to-refresh
+  document.addEventListener("touchmove", (e) => {
+    if (e.cancelable) e.preventDefault();
+  }, { passive: false });
+  document.addEventListener("gesturestart", (e) => e.preventDefault());
+
+  // ---------- boot ----------
+  thrownUp = loadState();
+  recomputeGeom();
+  buildMatches();
+  layoutAll(false);
+
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("sw.js").then((reg) => {
+        if (reg.waiting) reg.waiting.postMessage("SKIP_WAITING");
+        reg.addEventListener("updatefound", () => {
+          const nw = reg.installing;
+          if (!nw) return;
+          nw.addEventListener("statechange", () => {
+            if (nw.state === "installed" && navigator.serviceWorker.controller) {
+              nw.postMessage("SKIP_WAITING");
+            }
+          });
+        });
+      }).catch(() => {});
+      let reloaded = false;
+      navigator.serviceWorker.addEventListener("controllerchange", () => {
+        if (reloaded) return;
+        reloaded = true;
+        location.reload();
+      });
+    });
+  }
+})();
+</script>
+</body>
 </html>
